@@ -1,13 +1,77 @@
-[pytest.tool]
-testpaths = [
-    "it_jobs_meta"
+[project]
+name = "it-jobs-meta"
+description = "Data pipeline and meta-analysis dashboard for IT job postings"
+readme = "README.md"
+license = {text = "confidential"}
+dynamic = ["version"]
+requires-python = ">=3.10"
+dependencies = [
+    "boto3",
+    "croniter",
+    "dash",
+    "dash-bootstrap-components",
+    "flask-caching",
+    "geopy",
+    "numpy",
+    "pandas",
+    "pandera",
+    "plotly",
+    "pymongo",
+    "pytest",
+    "pyyaml",
+    "redis",
+    "requests",
+    "scikit-learn",
+    "sqlalchemy",
+    "urllib3",
+    "waitress",
 ]
+
+[project.optional-dependencies]
+dev = [
+    "black",
+    "flake8",
+    "isort",
+    "mypy",
+    "pip-tools",
+    "pytest",
+    "pytest-mock",
+    "types-croniter",
+    "types-pyyaml",
+    "types-redis",
+    "types-requests",
+    "types-waitress",
+]
+analysis = [
+    "beautifulsoup4",
+    "kaleido",
+]
+
+# Build system and packaging
+[build-system]
+requires = ["setuptools", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages.find = {}
+include-package-data = true
+
+[tool.setuptools.package-data]
+"it_jobs_meta" = ["dashboard/assets/*.css"]
+
+# Entry points
+[project.scripts]
+it-jobs-meta = "it_jobs_meta.__main__:main"
+
+# Development tools
+[pytest.tool]
+testpaths = [ "it_jobs_meta" ]
 
 [tool.mypy]
 ignore_missing_imports = true
 
 [tool.black]
-line-length = 79
+line-length = 100
 skip-string-normalization = true
 
 [tool.isort]
