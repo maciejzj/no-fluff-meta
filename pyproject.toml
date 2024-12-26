@@ -41,6 +41,7 @@ dev = [
     "types-pyyaml",
     "types-redis",
     "types-requests",
+    "types-retry",
     "types-waitress",
 ]
 analysis = [

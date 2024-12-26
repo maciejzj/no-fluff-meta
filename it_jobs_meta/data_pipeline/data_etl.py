@@ -48,16 +48,20 @@ class EtlTransformationEngine(Generic[ProcessDataType], ABC):
     interfaces for methods necessary to build the processing pipeline.
     """
 
-    COLS_TO_DROP = [
-        'renewed',
-        'logo',
-        'regions',
-        'flavors',
-        'topInSearch',
-        'highlighted',
-        'onlineInterviewAvailable',
-        'referralBonus',
-        'referralBonusCurrency',
+    # Columns that are unique per posting and can be used to identify duplicates.
+    COLS_UNIQUE_IDENTITY = ['name', 'posted', 'title']
+
+    # Columns to pick for further processing, the rest should be dropped.
+    COLS_TO_KEEP = [
+        'id',
+        'name',
+        'location',
+        'posted',
+        'title',
+        'technology',
+        'category',
+        'seniority',
+        'salary',
     ]
 
     # Look at the ETL pipeline implementation to see the predefined order of
@@ -66,11 +70,13 @@ class EtlTransformationEngine(Generic[ProcessDataType], ABC):
         'technology',
     ]
 
-    # In any column replace these strings
+    # Replace strings in columns specified by dict keys.
     VALS_TO_REPLACE = {
-        'node.js': 'node',
-        'angular': 'javascript',
-        'react': 'javascript',
+        'technology': {
+            'node.js': 'node',
+            'angular': 'javascript',
+            'react': 'javascript',
+        }
     }
 
     # Apply transformation like 'businessAnalyst' -> 'business Analyst'
@@ -87,25 +93,34 @@ class EtlTransformationEngine(Generic[ProcessDataType], ABC):
     # Names that require specific mappings instead of normal capitalizations.
     # Input strings should be transformed to lower before applying these cases.
     CAPITALIZE_SPECIAL_NAMES = {
-        '.net': '.Net',
-        'aws': 'AWS',
-        'ios': 'iOS',
-        'javascript': 'JavaScript',
-        'php': 'PHP',
-        'sql': 'SQL',
-        'b2b': 'B2B',
+        'technology': {
+            '.net': '.Net',
+            'aws': 'AWS',
+            'ios': 'iOS',
+            'javascript': 'JavaScript',
+            'php': 'PHP',
+            'sql': 'SQL',
+        },
+        'contract_type': {
+            'b2b': 'B2B',
+            'B2b': 'B2B',
+        },
     }
 
-    # Limit locations to the given countries.
-    COUNTRY_FILTERS = ['Polska']
+    # Limit locations to the given countries, use ISO 3166-1alpha2 codes.
+    COUNTRY_FILTERS = ['pl']
+
+    # Minimum mean salary based on minimum wage in Poland (we assume that lower salaries are mistakes).
+    SALARY_CURRENCY = 'PLN'
+    MIN_MEAN_SALARY = 3500
 
     @abstractmethod
-    def drop_unwanted(self, data: ProcessDataType) -> ProcessDataType:
-        """Drop unwanted columns in the COLS_TO_DROP."""
+    def select_required(self, data: ProcessDataType) -> ProcessDataType:
+        """Select only the required columns specified in COLS_TO_KEEP."""
 
     @abstractmethod
     def drop_duplicates(self, data: ProcessDataType) -> ProcessDataType:
-        """Drop duplicated rows in the dataset."""
+        """Drop duplicated rows in the dataset based on COLS_UNIQUE_IDENTITY."""
 
     @abstractmethod
     def unify_to_lower(self, data: ProcessDataType) -> ProcessDataType:
@@ -202,7 +217,7 @@ class EtlPipeline(Generic[ProcessDataType, PipelineInputType]):
         return self._extraction_engine.extract(input_)
 
     def transform(self, data: ProcessDataType) -> ProcessDataType:
-        data = self._transformation_engine.drop_unwanted(data)
+        data = self._transformation_engine.select_required(data)
         data = self._transformation_engine.drop_duplicates(data)
         data = self._transformation_engine.extract_remote(data)
         data = self._transformation_engine.extract_locations(data)
@@ -235,11 +250,8 @@ class PandasEtlExtractionFromJsonStr(EtlExtractionEngine[str, pd.DataFrame]):
         """
         data = NoFluffJObsPostingsData.from_json_str(input_)
         self.validate_nofluffjobs_data(data)
-        metadata_df = pd.DataFrame(
-            dataclasses.asdict(data.metadata), index=[0]
-        )
+        metadata_df = pd.DataFrame(dataclasses.asdict(data.metadata), index=[0])
         data_df = pd.DataFrame(data.raw_data['postings'])
-        data_df = data_df.set_index('id')
         return metadata_df, data_df
 
     @staticmethod
@@ -251,9 +263,7 @@ class PandasEtlExtractionFromJsonStr(EtlExtractionEngine[str, pd.DataFrame]):
                 f'"nofluffjobs", got: {data.metadata.source_name}'
             )
         try:
-            assert data.raw_data['totalCount'] == len(
-                data.raw_data['postings']
-            )
+            assert data.raw_data['totalCount'] == len(data.raw_data['postings'])
         except KeyError as error:
             raise ValueError(
                 'Data extractor got correct date format type and '
@@ -267,19 +277,23 @@ class PandasEtlTransformationEngine(EtlTransformationEngine[pd.DataFrame]):
             country_filter=EtlTransformationEngine.COUNTRY_FILTERS
         )
 
-    def drop_unwanted(self, data: pd.DataFrame) -> pd.DataFrame:
-        return data.drop(columns=EtlTransformationEngine.COLS_TO_DROP)
+    def select_required(self, data: pd.DataFrame) -> pd.DataFrame:
+        return data[self.COLS_TO_KEEP]
 
     def drop_duplicates(self, data: pd.DataFrame) -> pd.DataFrame:
-        return data[~data.index.duplicated(keep='first')]
+        return data.drop_duplicates(subset=self.COLS_UNIQUE_IDENTITY)
 
     def unify_to_lower(self, data: pd.DataFrame) -> pd.DataFrame:
-        for col in EtlTransformationEngine.COLS_TO_LOWER:
+        for col in self.COLS_TO_LOWER:
             data[col] = data[col].str.lower()
         return data
 
     def replace_values(self, data: pd.DataFrame) -> pd.DataFrame:
-        return data.replace(to_replace=EtlTransformationEngine.VALS_TO_REPLACE)
+        for col in self.VALS_TO_REPLACE:
+            data[col].replace(
+                to_replace=self.VALS_TO_REPLACE[col], inplace=True
+            )
+        return data
 
     def split_on_capitals(self, data: pd.DataFrame) -> pd.DataFrame:
         for col in EtlTransformationEngine.COLS_TO_SPLIT_ON_CAPITAL_LETTERS:
@@ -297,7 +311,9 @@ class PandasEtlTransformationEngine(EtlTransformationEngine[pd.DataFrame]):
         specials = EtlTransformationEngine.CAPITALIZE_SPECIAL_NAMES
         for col in EtlTransformationEngine.COLS_TO_CAPITALIZE:
             data[col] = data[col][data[col].notna()].transform(
-                lambda s: specials[s] if s in specials else s.capitalize()
+                lambda s: (
+                    specials[col][s] if s in specials[col] else s.capitalize()
+                )
             )
         return data
 
@@ -309,10 +325,11 @@ class PandasEtlTransformationEngine(EtlTransformationEngine[pd.DataFrame]):
 
     def extract_locations(self, data: pd.DataFrame) -> pd.DataFrame:
         data['city'] = data['location'].transform(
-            lambda location_dict: [
-                self._geolocator(loc['city'])
-                for loc in location_dict['places']
-                if 'city' in loc
+            lambda loc_dict: [
+                city
+                for location in loc_dict['places']
+                if 'city' in location
+                and (city := self._geolocator(location['city'])) is not None
             ]
         )
         return data
@@ -334,9 +351,10 @@ class PandasEtlTransformationEngine(EtlTransformationEngine[pd.DataFrame]):
 
         data = data[
             data['salary'].transform(
-                lambda salary_dict: salary_dict['currency'] == 'PLN'
+                lambda salary_dict: salary_dict['currency'] == self.SALARY_CURRENCY
             )
         ]
+        data = data[data['salary_mean'] > self.MIN_MEAN_SALARY]
         return data
 
     def unify_missing_values(self, data: pd.DataFrame) -> pd.DataFrame:
@@ -354,7 +372,6 @@ class PandasEtlMongodbLoadingEngine(EtlLoadingEngine[pd.DataFrame]):
         'title',
         'technology',
         'category',
-        'url',
         'remote',
         'contract_type',
         'salary_min',
@@ -404,7 +421,6 @@ class PandasEtlSqlLoadingEngine(EtlLoadingEngine[pd.DataFrame]):
         'title',
         'technology',
         'category',
-        'url',
         'remote',
     ]
 

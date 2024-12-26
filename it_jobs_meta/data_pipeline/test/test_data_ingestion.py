@@ -45,9 +45,7 @@ class TestNoFluffJobsPostingsDataSource:
         result = data.make_key_for_data()
         assert result == expected
 
-    def test_make_json_string_returns_json_with_correct_structure(
-        self, mocker
-    ):
+    def test_make_json_string_returns_json_with_correct_structure(self, mocker):
         mocker.patch('requests.get', return_value=MockResponse())
 
         data = NoFluffJobsPostingsDataSource().get()

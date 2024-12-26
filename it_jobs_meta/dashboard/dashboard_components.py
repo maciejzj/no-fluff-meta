@@ -243,10 +243,12 @@ class RemotePieChart(GraphFigure):
 class SalariesMap(GraphFigure):
     TITLE = 'Mean salary by location (PLN)'
     N_MOST_FREQ = 15
+    POLAND_LAT, POLAND_LON = 52.0, 19.0
+    PROJECTION_SCALE = 10
 
     @classmethod
     def make_fig(cls, postings_df) -> go.Figure:
-        postings_df = postings_df.explode('city')
+        postings_df = postings_df.explode('city').dropna(subset=['city'])
         postings_df[['city', 'lat', 'lon']] = postings_df['city'].transform(
             lambda city: pd.Series([city[0], city[1], city[2]])
         )
@@ -265,19 +267,26 @@ class SalariesMap(GraphFigure):
 
         fig = px.scatter_geo(
             cities_salaries,
-            scope='europe',
             lat='lat',
             lon='lon',
             size='job_counts',
             color='salary_mean',
             title=cls.TITLE,
-            fitbounds='locations',
             labels={
                 'salary_mean': 'Mean salary',
                 'job_counts': 'Number of jobs',
             },
             hover_data={'city': True, 'lat': False, 'lon': False},
         )
+
+        fig.update_layout(
+            geo=dict(
+                scope='europe',
+                center={'lat': cls.POLAND_LAT, 'lon': cls.POLAND_LON},
+                projection_scale=cls.PROJECTION_SCALE,
+            )
+        )
+
         fig = center_title(fig)
         return fig
 
@@ -357,9 +366,7 @@ class TechnologiesViolinChart(GraphFigure):
         tech_most_freq = get_rows_with_n_most_frequent_vals_in_col(
             postings_df, 'technology', cls.N_MOST_FREQ_TECH
         )
-        limited = tech_most_freq[
-            tech_most_freq['salary_mean'] < cls.MAX_SALARY
-        ]
+        limited = tech_most_freq[tech_most_freq['salary_mean'] < cls.MAX_SALARY]
         limited = limited[
             limited['seniority'].isin(('Junior', 'Mid', 'Senior'))
         ]
@@ -405,9 +412,7 @@ class ContractTypeViolinChart(GraphFigure):
         tech_most_freq = get_rows_with_n_most_frequent_vals_in_col(
             postings_df, 'technology', cls.N_MOST_FREQ_TECH
         )
-        limited = tech_most_freq[
-            tech_most_freq['salary_mean'] < cls.MAX_SALARY
-        ]
+        limited = tech_most_freq[tech_most_freq['salary_mean'] < cls.MAX_SALARY]
         b2b_df = limited[limited['contract_type'] == 'B2B']
         perm_df = limited[limited['contract_type'] == 'Permanent']
 
