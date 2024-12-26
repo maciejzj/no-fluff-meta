@@ -32,16 +32,14 @@ class NoFluffJobsPostingsDataSource(PostingsDataSource):
         raw_data = response.json()
         datetime_now = dt.datetime.now()
 
-        metadata = PostingsMetadata(
-            source_name=self.SOURCE_NAME, obtained_datetime=datetime_now
-        )
+        metadata = PostingsMetadata(source_name=self.SOURCE_NAME, obtained_datetime=datetime_now)
         data = NoFluffJObsPostingsData(metadata=metadata, raw_data=raw_data)
 
         return data
 
 
 class ArchiveNoFluffJObsPostingsDataSource(PostingsDataSource):
-    """Load postings data from archive under URL (from data lake or file)"""
+    """Load postings data from archive under URL (from data lake or file)."""
 
     def __init__(self, posting_url: str):
         """

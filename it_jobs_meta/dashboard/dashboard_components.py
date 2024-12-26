@@ -92,9 +92,7 @@ class GraphRegistry:
         """Make all registered graphs using the given data and get them."""
         graphs: dict[Graph, go.Figure] = {}
         for graph_key in cls._graph_makers:
-            graphs[graph_key] = dcc.Graph(
-                figure=cls._graph_makers[graph_key].make_fig(postings_df)
-            )
+            graphs[graph_key] = dcc.Graph(figure=cls._graph_makers[graph_key].make_fig(postings_df))
         return graphs
 
     @classmethod
@@ -157,9 +155,7 @@ class CategoriesTechnologiesSankeyChart(GraphFigure):
             & postings_df['technology'].isin(tech_most_freq)
         ]
 
-        catgrp = cat_tech_most_freq_df.groupby('category')[
-            'technology'
-        ].value_counts()
+        catgrp = cat_tech_most_freq_df.groupby('category')['technology'].value_counts()
         catgrp = catgrp.drop(catgrp[catgrp < cls.MIN_FLOW].index)
         catgrp = catgrp.dropna()
 
@@ -214,9 +210,7 @@ class SenioritiesHistogram(GraphFigure):
         postings_df = postings_df[postings_df['salary_mean'] > 0]
         postings_df = sort_by_seniority(postings_df)
 
-        fig = px.histogram(
-            postings_df, x='salary_mean', color='seniority', title=cls.TITLE
-        )
+        fig = px.histogram(postings_df, x='salary_mean', color='seniority', title=cls.TITLE)
         fig = fig.update_layout(
             legend_title_text=None,
             xaxis_title_text='Mean salary (PLN)',
@@ -257,12 +251,8 @@ class SalariesMap(GraphFigure):
             postings_df, 'city', cls.N_MOST_FREQ
         )
         job_counts = postings_df.groupby('city')['_id'].count()
-        salaries = postings_df.groupby('city')[
-            ['salary_mean', 'lat', 'lon']
-        ].mean()
-        cities_salaries = pd.concat(
-            [job_counts.rename('job_counts'), salaries], axis=1
-        )
+        salaries = postings_df.groupby('city')[['salary_mean', 'lat', 'lon']].mean()
+        cities_salaries = pd.concat([job_counts.rename('job_counts'), salaries], axis=1)
         cities_salaries = cities_salaries.reset_index()
 
         fig = px.scatter_geo(
@@ -367,9 +357,7 @@ class TechnologiesViolinChart(GraphFigure):
             postings_df, 'technology', cls.N_MOST_FREQ_TECH
         )
         limited = tech_most_freq[tech_most_freq['salary_mean'] < cls.MAX_SALARY]
-        limited = limited[
-            limited['seniority'].isin(('Junior', 'Mid', 'Senior'))
-        ]
+        limited = limited[limited['seniority'].isin(('Junior', 'Mid', 'Senior'))]
         limited = sort_by_seniority(limited)
         # Plotly has problems with creating violin plots if there are too few
         # samples, we filter out seniority and technology paris for which
@@ -388,9 +376,7 @@ class TechnologiesViolinChart(GraphFigure):
             points=False,
         )
         fig = move_legend_to_top(fig)
-        fig = fig.update_traces(
-            side='positive', width=1.5, spanmode='hard', meanline_visible=True
-        )
+        fig = fig.update_traces(side='positive', width=1.5, spanmode='hard', meanline_visible=True)
         fig = fig.update_layout(
             height=600,
             xaxis_title_text='Mean salary (PLN)',

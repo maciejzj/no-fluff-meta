@@ -14,9 +14,7 @@ class CliArgumentParser:
     """Command line parser for the it-jobs-meta application."""
 
     PROG = 'it-jobs-meta'
-    DESCRIPTION = (
-        'Data pipeline and meta-analysis dashboard for IT job postings'
-    )
+    DESCRIPTION = 'Data pipeline and meta-analysis dashboard for IT job postings'
     PIPELINE_DESCRIPTION = (
         'Run data pipeline once or periodically, scrap data, store it in the '
         'data lake, load processed data to the data warehouse.'
@@ -37,9 +35,7 @@ class CliArgumentParser:
             description=self.DESCRIPTION,
             formatter_class=argparse.ArgumentDefaultsHelpFormatter,
         )
-        self._subparsers = self._parser.add_subparsers(
-            dest='command', required=True
-        )
+        self._subparsers = self._parser.add_subparsers(dest='command', required=True)
         self._build_main_command()
         self._build_pipeline_command()
         self._build_dashboard_command()
@@ -63,8 +59,7 @@ class CliArgumentParser:
                 return DataLakeImpl.S3BUCKET, self.args['s3_bucket']
             case _:
                 raise ValueError(
-                    'Parsed arguments resulted in unsupported or invalid data'
-                    ' lake configuration'
+                    'Parsed arguments resulted in unsupported or invalid data' ' lake configuration'
                 )
 
     def extract_etl_loader(self) -> tuple[EtlLoaderImpl, Path]:
@@ -162,9 +157,7 @@ class CliArgumentParser:
         )
 
         # Data warehouse setup
-        etl_loader_arg_grp = parser_pipeline.add_mutually_exclusive_group(
-            required=True
-        )
+        etl_loader_arg_grp = parser_pipeline.add_mutually_exclusive_group(required=True)
         etl_loader_arg_grp.add_argument(
             '-m',
             '--mongodb',
@@ -204,9 +197,7 @@ class CliArgumentParser:
         )
 
         # Data provsion setup (from data warehouse)
-        data_provider_arg_grp = parser_dashboard.add_mutually_exclusive_group(
-            required=True
-        )
+        data_provider_arg_grp = parser_dashboard.add_mutually_exclusive_group(required=True)
         data_provider_arg_grp.add_argument(
             '-m',
             '--mongodb',

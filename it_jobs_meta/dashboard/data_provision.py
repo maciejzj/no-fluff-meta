@@ -35,9 +35,7 @@ class MongodbDashboardDataProvider(DashboardDataProvider):
         self._db = self._db_client[db_name]
 
     @classmethod
-    def from_config_file(
-        cls, config_file_path: Path
-    ) -> 'MongodbDashboardDataProvider':
+    def from_config_file(cls, config_file_path: Path) -> 'MongodbDashboardDataProvider':
         return cls(**load_yaml_as_dict(config_file_path))
 
     def gather_data(self) -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -49,9 +47,7 @@ class MongodbDashboardDataProvider(DashboardDataProvider):
         metadata_df = pd.json_normalize(self._db['metadata'].find())
         postings_df = pd.json_normalize(self._db['postings'].find())
         if metadata_df.empty or postings_df.empty:
-            raise RuntimeError(
-                'Data gather for the dashboard resulted in empty datasets'
-            )
+            raise RuntimeError('Data gather for the dashboard resulted in empty datasets')
         return metadata_df, postings_df
 
 
@@ -67,11 +63,8 @@ class DashboardDataProviderFactory:
     def make(self) -> DashboardDataProvider:
         match self._impl_type:
             case DashboardProviderImpl.MONGODB:
-                return MongodbDashboardDataProvider.from_config_file(
-                    self._config_path
-                )
+                return MongodbDashboardDataProvider.from_config_file(self._config_path)
             case _:
                 raise ValueError(
-                    'Selected data provider implementation is not supported '
-                    'or invalid'
+                    'Selected data provider implementation is not supported ' 'or invalid'
                 )
