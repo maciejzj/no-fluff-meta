@@ -10,7 +10,7 @@ from it_jobs_meta.data_pipeline.data_etl import (
 
 
 @pytest.fixture
-def postings_list_mock():
+def postings_list():
     return [
         {
             'id': 'ELGZSKOL',
@@ -71,15 +71,15 @@ def postings_list_mock():
 
 
 @pytest.fixture
-def postings_response_json_dict_mock(postings_list_mock):
+def postings_response_json_dict(postings_list):
     return {
-        'postings': postings_list_mock,
+        'postings': postings_list,
         'totalCount': 1,
     }
 
 
 @pytest.fixture
-def postings_metadata_dict_mock():
+def postings_metadata_dict():
     return {
         'source_name': 'nofluffjobs',
         'obtained_datetime': '2021-12-01 08:30:05',
@@ -87,64 +87,54 @@ def postings_metadata_dict_mock():
 
 
 @pytest.fixture
-def postings_data_dict_mock(
-    postings_metadata_dict_mock, postings_response_json_dict_mock
-):
+def postings_data_dict(postings_metadata_dict, postings_response_json_dict):
     return {
-        'metadata': postings_metadata_dict_mock,
-        'data': postings_response_json_dict_mock,
+        'metadata': postings_metadata_dict,
+        'data': postings_response_json_dict,
     }
 
 
-class TestHappyPathPandasDataWarehouseETL:
-    def setup_method(self, postings_list_mock):
-        self.df = pd.DataFrame(postings_list_mock)
-        self.transformer = PandasEtlTransformationEngine()
+@pytest.fixture
+def df(postings_list):
+    return pd.DataFrame(postings_list)
 
-    def test_keeps_required_cols_correctly(self):
-        result = self.transformer.select_required(self.df)
-        for key in EtlTransformationEngine.COLS_TO_KEEP:
-            assert key in result
 
-    def test_extracts_remote_correctly(self):
-        result = self.transformer.extract_remote(self.df)
-        assert 'remote' in result
-        assert result[result['id'] == 'ELGZSKOL']['remote'].iloc[0]
+@pytest.fixture
+def transformer():
+    return PandasEtlTransformationEngine()
 
-    def test_extracts_locations_correctly(self):
-        result = self.transformer.extract_locations(self.df)
-        assert 'city' in result
-        assert (
-            result[result['id'] == 'ELGZSKOL']['city'].iloc[0][0][0]
-            == 'Warszawa'
-        )
-        assert (
-            pytest.approx(
-                result[result['id'] == 'ELGZSKOL']['city'].iloc[0][0][1], 1
-            )
-            == 52.2
-        )
-        assert (
-            pytest.approx(
-                result[result['id'] == 'ELGZSKOL']['city'].iloc[0][0][2], 1
-            )
-            == 21.0
-        )
 
-    def test_extracts_contract_type_correctly(self):
-        result = self.transformer.extract_contract_type(self.df)
-        assert 'contract_type' in result
-        assert (
-            result[result['id'] == 'ELGZSKOL']['contract_type'].iloc[0] == 'b2b'
-        )
+def test_keeps_required_cols(df, transformer):
+    result = transformer.select_required(df)
+    for key in EtlTransformationEngine.COLS_TO_KEEP:
+        assert key in result
 
-    def test_extracts_salaries_correctly(self):
-        result = self.transformer.extract_salaries(self.df)
-        assert 'salary_min' in result
-        assert 'salary_max' in result
-        assert 'salary_mean' in result
-        assert result[result['id'] == 'ELGZSKOL']['salary_min'].iloc[0] == 20000
-        assert result[result['id'] == 'ELGZSKOL']['salary_max'].iloc[0] == 25000
-        assert (
-            result[result['id'] == 'ELGZSKOL']['salary_mean'].iloc[0] == 22500
-        )
+
+def test_extracts_remote(df, transformer):
+    result = transformer.extract_remote(df)
+    assert 'remote' in result
+    assert result[result['id'] == 'ELGZSKOL']['remote'].iloc[0]
+
+
+def test_extracts_locations(df, transformer):
+    result = transformer.extract_locations(df)
+    assert 'city' in result
+    assert result[result['id'] == 'ELGZSKOL']['city'].iloc[0][0][0] == 'Warszawa'
+    assert pytest.approx(result[result['id'] == 'ELGZSKOL']['city'].iloc[0][0][1], 1) == 52.2
+    assert pytest.approx(result[result['id'] == 'ELGZSKOL']['city'].iloc[0][0][2], 1) == 21.0
+
+
+def test_extracts_contract_type(df, transformer):
+    result = transformer.extract_contract_type(df)
+    assert 'contract_type' in result
+    assert result[result['id'] == 'ELGZSKOL']['contract_type'].iloc[0] == 'b2b'
+
+
+def test_extracts_salaries(df, transformer):
+    result = transformer.extract_salaries(df)
+    assert 'salary_min' in result
+    assert 'salary_max' in result
+    assert 'salary_mean' in result
+    assert result[result['id'] == 'ELGZSKOL']['salary_min'].iloc[0] == 20000
+    assert result[result['id'] == 'ELGZSKOL']['salary_max'].iloc[0] == 25000
+    assert result[result['id'] == 'ELGZSKOL']['salary_mean'].iloc[0] == 22500
