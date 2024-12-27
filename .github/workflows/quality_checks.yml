@@ -7,7 +7,7 @@ on:
   pull_request:
     branches:
       - "master"
-
+      - "develop"
 
 jobs:
   build:
@@ -19,19 +19,24 @@ jobs:
       uses: actions/setup-python@v2
       with:
         python-version: "3.11"
+
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
-    - name: Lint with flake8
+
+    - name: Format check
       run: |
-        # Stop the build if there are Python syntax errors or undefined names
-        flake8 it_jobs_meta --count --select=E9,F63,F7,F82 --show-source --statistics
-        # Exit-zero treats all errors as warnings
-        flake8 it_jobs_meta --count --exit-zero --statistics
-    - name: Typecheck with mypy
+        make format-check
+
+    - name: Lint check
       run: |
-        mypy it_jobs_meta
-    - name: Test with pytest
+        make lint
+
+    - name: Type check
       run: |
-        pytest it_jobs_meta
+        make type-check
+
+    - name: Test
+      run: |
+        make test

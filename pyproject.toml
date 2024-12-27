@@ -30,11 +30,13 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
+    "autoflake",
     "black",
     "flake8",
     "isort",
     "mypy",
     "pip-tools",
+    "pydocstringformatter",
     "pytest",
     "pytest-mock",
     "types-croniter",

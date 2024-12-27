@@ -66,9 +66,7 @@ class DataPipeline:
                 logging.info('Attempting to archive raw data in data lake')
                 data_lake = self._data_lake_factory.make()
                 data_lake.set_data(data_key, data.make_json_str_from_data())
-                logging.info(
-                    f'Data archival succeeded, stored under "{data_key}" key'
-                )
+                logging.info(f'Data archival succeeded, stored under "{data_key}" key')
 
             logging.info('Attempting to perform data warehousing step')
             etl_pipeline = EtlPipeline(
@@ -91,9 +89,7 @@ def main():
     Reads postings data from test JSON file and feeds it to the ETL pipeline.
     """
 
-    test_json_file_path = Path(
-        'it_jobs_meta/data_pipeline/test/1640874783_nofluffjobs.json'
-    )
+    test_json_file_path = Path('it_jobs_meta/data_pipeline/test/1640874783_nofluffjobs.json')
     mongodb_config_path = Path('config/mongodb_config.yml')
     with open(test_json_file_path, 'r', encoding='utf-8') as json_data_file:
         data_as_json = json_data_file.read()

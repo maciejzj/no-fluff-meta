@@ -44,6 +44,4 @@ class Schemas:
         }
     )
 
-    seniorities = pa.DataFrameSchema(
-        {'id': pa.Column(str), 'seniority': pa.Column(str)}
-    )
+    seniorities = pa.DataFrameSchema({'id': pa.Column(str), 'seniority': pa.Column(str)})

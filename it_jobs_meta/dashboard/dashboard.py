@@ -112,9 +112,7 @@ class DashboardApp:
     ) -> LayoutDynamicContent:
         obtained_datetime = pd.to_datetime(metadata_df['obtained_datetime'][0])
         graphs = GraphRegistry.make(data_df)
-        return LayoutDynamicContent(
-            obtained_datetime=obtained_datetime, graphs=graphs
-        )
+        return LayoutDynamicContent(obtained_datetime=obtained_datetime, graphs=graphs)
 
 
 def main():

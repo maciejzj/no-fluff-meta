@@ -15,11 +15,17 @@ class DataLake(ABC):
 
     @abstractmethod
     def set_data(self, key: str, data: str):
-        """Store data under key. Data is assumed to be a JSON string."""
+        """Store data under key.
+
+        Data is assumed to be a JSON string.
+        """
 
     @abstractmethod
     def get_data(self, key: str) -> str:
-        """Get data stored under key. Data is assumed ot be a JSON string."""
+        """Get data stored under key.
+
+        Data is assumed ot be a JSON string.
+        """
 
 
 class RedisDataLake(DataLake):
@@ -83,7 +89,4 @@ class DataLakeFactory:
             case DataLakeImpl.S3BUCKET:
                 return S3DataLake.from_config_file(self._config_path)
             case _:
-                raise ValueError(
-                    'Selected data lake implementation is not supported or '
-                    'invalid'
-                )
+                raise ValueError('Selected data lake implementation is not supported or ' 'invalid')

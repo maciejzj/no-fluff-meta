@@ -32,9 +32,7 @@ class EtlExtractionEngine(Generic[PipelineInputType, ProcessDataType], ABC):
     """
 
     @abstractmethod
-    def extract(
-        self, input_: PipelineInputType
-    ) -> tuple[ProcessDataType, ProcessDataType]:
+    def extract(self, input_: PipelineInputType) -> tuple[ProcessDataType, ProcessDataType]:
         """Extract data from the input and get it the pipeline compatible form.
 
         :return: Tuple with metadata and data dataframes (metadata, data).
@@ -179,9 +177,7 @@ class EtlLoadingEngine(Generic[ProcessDataType], ABC):
     """Loader for placing processing results in databases."""
 
     @abstractmethod
-    def load_tables_to_warehouse(
-        self, metadata: ProcessDataType, data: ProcessDataType
-    ):
+    def load_tables_to_warehouse(self, metadata: ProcessDataType, data: ProcessDataType):
         """Load processed data into a database."""
 
 
@@ -190,9 +186,7 @@ class EtlPipeline(Generic[ProcessDataType, PipelineInputType]):
 
     def __init__(
         self,
-        extraction_engine: EtlExtractionEngine[
-            PipelineInputType, ProcessDataType
-        ],
+        extraction_engine: EtlExtractionEngine[PipelineInputType, ProcessDataType],
         transformation_engine: EtlTransformationEngine[ProcessDataType],
         loading_engine: EtlLoadingEngine[ProcessDataType],
     ):
@@ -211,9 +205,7 @@ class EtlPipeline(Generic[ProcessDataType, PipelineInputType]):
         data = self.transform(data)
         self.load(metadata, data)
 
-    def extract(
-        self, input_: PipelineInputType
-    ) -> tuple[ProcessDataType, ProcessDataType]:
+    def extract(self, input_: PipelineInputType) -> tuple[ProcessDataType, ProcessDataType]:
         return self._extraction_engine.extract(input_)
 
     def transform(self, data: ProcessDataType) -> ProcessDataType:
@@ -273,9 +265,7 @@ class PandasEtlExtractionFromJsonStr(EtlExtractionEngine[str, pd.DataFrame]):
 
 class PandasEtlTransformationEngine(EtlTransformationEngine[pd.DataFrame]):
     def __init__(self):
-        self._geolocator = Geolocator(
-            country_filter=EtlTransformationEngine.COUNTRY_FILTERS
-        )
+        self._geolocator = Geolocator(country_filter=EtlTransformationEngine.COUNTRY_FILTERS)
 
     def select_required(self, data: pd.DataFrame) -> pd.DataFrame:
         return data[self.COLS_TO_KEEP]
@@ -290,16 +280,12 @@ class PandasEtlTransformationEngine(EtlTransformationEngine[pd.DataFrame]):
 
     def replace_values(self, data: pd.DataFrame) -> pd.DataFrame:
         for col in self.VALS_TO_REPLACE:
-            data[col].replace(
-                to_replace=self.VALS_TO_REPLACE[col], inplace=True
-            )
+            data[col].replace(to_replace=self.VALS_TO_REPLACE[col], inplace=True)
         return data
 
     def split_on_capitals(self, data: pd.DataFrame) -> pd.DataFrame:
         for col in EtlTransformationEngine.COLS_TO_SPLIT_ON_CAPITAL_LETTERS:
-            data[col] = data[col].str.replace(
-                r'(\w)([A-Z])', r'\1 \2', regex=True
-            )
+            data[col] = data[col].str.replace(r'(\w)([A-Z])', r'\1 \2', regex=True)
         return data
 
     def to_title_case(self, data: pd.DataFrame) -> pd.DataFrame:
@@ -311,9 +297,7 @@ class PandasEtlTransformationEngine(EtlTransformationEngine[pd.DataFrame]):
         specials = EtlTransformationEngine.CAPITALIZE_SPECIAL_NAMES
         for col in EtlTransformationEngine.COLS_TO_CAPITALIZE:
             data[col] = data[col][data[col].notna()].transform(
-                lambda s: (
-                    specials[col][s] if s in specials[col] else s.capitalize()
-                )
+                lambda s: (specials[col][s] if s in specials[col] else s.capitalize())
             )
         return data
 
@@ -328,25 +312,18 @@ class PandasEtlTransformationEngine(EtlTransformationEngine[pd.DataFrame]):
             lambda loc_dict: [
                 city
                 for location in loc_dict['places']
-                if 'city' in location
-                and (city := self._geolocator(location['city'])) is not None
+                if 'city' in location and (city := self._geolocator(location['city'])) is not None
             ]
         )
         return data
 
     def extract_contract_type(self, data: pd.DataFrame) -> pd.DataFrame:
-        data['contract_type'] = data['salary'].transform(
-            lambda salary_dict: salary_dict['type']
-        )
+        data['contract_type'] = data['salary'].transform(lambda salary_dict: salary_dict['type'])
         return data
 
     def extract_salaries(self, data: pd.DataFrame) -> pd.DataFrame:
-        data['salary_min'] = data['salary'].transform(
-            lambda salary_dict: salary_dict['from']
-        )
-        data['salary_max'] = data['salary'].transform(
-            lambda salary_dict: salary_dict['to']
-        )
+        data['salary_min'] = data['salary'].transform(lambda salary_dict: salary_dict['from'])
+        data['salary_max'] = data['salary'].transform(lambda salary_dict: salary_dict['to'])
         data['salary_mean'] = data[['salary_max', 'salary_min']].mean(axis=1)
 
         data = data[
@@ -395,22 +372,16 @@ class PandasEtlMongodbLoadingEngine(EtlLoadingEngine[pd.DataFrame]):
         self._db = self._db_client[db_name]
 
     @classmethod
-    def from_config_file(
-        cls, config_path: Path
-    ) -> 'PandasEtlMongodbLoadingEngine':
+    def from_config_file(cls, config_path: Path) -> 'PandasEtlMongodbLoadingEngine':
         return cls(**load_yaml_as_dict(config_path))
 
-    def load_tables_to_warehouse(
-        self, metadata: pd.DataFrame, data: pd.DataFrame
-    ):
+    def load_tables_to_warehouse(self, metadata: pd.DataFrame, data: pd.DataFrame):
         self._db['metadata'].drop()
         self._db['postings'].drop()
 
         self._db['metadata'].insert_one(metadata.to_dict('records')[0])
         self._db['postings'].insert_many(
-            data[PandasEtlMongodbLoadingEngine.POSTINGS_TABLE_COLS]
-            .reset_index()
-            .to_dict('records')
+            data[PandasEtlMongodbLoadingEngine.POSTINGS_TABLE_COLS].reset_index().to_dict('records')
         )
 
 
@@ -435,22 +406,16 @@ class PandasEtlSqlLoadingEngine(EtlLoadingEngine[pd.DataFrame]):
 
     SENIORITY_TABLE_COLS = ['seniority']
 
-    def __init__(
-        self, user_name: str, password: str, host: str, db_name: str, port=3306
-    ):
+    def __init__(self, user_name: str, password: str, host: str, db_name: str, port=3306):
         self._db_con = db.create_engine(
             f'mysql+pymysql://{user_name}:{password}@{host}:{port}/{db_name}'
         )
 
     @classmethod
-    def from_config_file(
-        cls, config_file_path: Path
-    ) -> 'PandasEtlSqlLoadingEngine':
+    def from_config_file(cls, config_file_path: Path) -> 'PandasEtlSqlLoadingEngine':
         return cls(**load_yaml_as_dict(config_file_path))
 
-    def load_tables_to_warehouse(
-        self, metadata: pd.DataFrame, data: pd.DataFrame
-    ):
+    def load_tables_to_warehouse(self, metadata: pd.DataFrame, data: pd.DataFrame):
         metadata.to_sql('metadata', con=self._db_con, if_exists='replace')
 
         postings_df = self.prepare_postings_table(data)
@@ -463,20 +428,14 @@ class PandasEtlSqlLoadingEngine(EtlLoadingEngine[pd.DataFrame]):
         location_df.to_sql('locations', con=self._db_con, if_exists='replace')
 
         seniority_df = self.prepare_seniorities_table(data)
-        seniority_df.to_sql(
-            'seniorities', con=self._db_con, if_exists='replace'
-        )
+        seniority_df.to_sql('seniorities', con=self._db_con, if_exists='replace')
 
     def prepare_postings_table(self, data: pd.DataFrame) -> pd.DataFrame:
-        postings_df = data[
-            PandasEtlSqlLoadingEngine.POSTINGS_TABLE_COLS
-        ].reset_index()
+        postings_df = data[PandasEtlSqlLoadingEngine.POSTINGS_TABLE_COLS].reset_index()
         return Schemas.postings.validate(postings_df)
 
     def prepare_salaries_table(self, data: pd.DataFrame) -> pd.DataFrame:
-        salaries_df = data[
-            PandasEtlSqlLoadingEngine.SALARIES_TABLE_COLS
-        ].reset_index()
+        salaries_df = data[PandasEtlSqlLoadingEngine.SALARIES_TABLE_COLS].reset_index()
         return Schemas.salaries.validate(salaries_df)
 
     def prepare_locations_table(self, data: pd.DataFrame) -> pd.DataFrame:
@@ -484,17 +443,13 @@ class PandasEtlSqlLoadingEngine(EtlLoadingEngine[pd.DataFrame]):
         locations_df[['city', 'lat', 'lon']] = locations_df['city'].transform(
             lambda city: pd.Series([city[0], city[1], city[2]])
         )
-        locations_df = locations_df[
-            PandasEtlSqlLoadingEngine.LOCATIONS_TABLE_COLS
-        ]
+        locations_df = locations_df[PandasEtlSqlLoadingEngine.LOCATIONS_TABLE_COLS]
         locations_df = locations_df.dropna().reset_index()
         return Schemas.locations.validate(locations_df)
 
     def prepare_seniorities_table(self, data: pd.DataFrame) -> pd.DataFrame:
         seniority_df = data.explode('seniority')
-        seniority_df = seniority_df[
-            PandasEtlSqlLoadingEngine.SENIORITY_TABLE_COLS
-        ].reset_index()
+        seniority_df = seniority_df[PandasEtlSqlLoadingEngine.SENIORITY_TABLE_COLS].reset_index()
         return Schemas.seniorities.validate(seniority_df)
 
 
@@ -511,15 +466,10 @@ class EtlLoaderFactory:
     def make(self) -> EtlLoadingEngine:
         match self._impl_type:
             case EtlLoaderImpl.MONGODB:
-                return PandasEtlMongodbLoadingEngine.from_config_file(
-                    self._config_path
-                )
+                return PandasEtlMongodbLoadingEngine.from_config_file(self._config_path)
             case EtlLoaderImpl.SQL:
-                return PandasEtlSqlLoadingEngine.from_config_file(
-                    self._config_path
-                )
+                return PandasEtlSqlLoadingEngine.from_config_file(self._config_path)
             case _:
                 raise ValueError(
-                    'Selected ETL loader implementation is not supported or '
-                    'invalid'
+                    'Selected ETL loader implementation is not supported or ' 'invalid'
                 )

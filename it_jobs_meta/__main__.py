@@ -20,9 +20,7 @@ def main():
     parser = CliArgumentParser()
     setup_logging(
         parser.args['log_path'],
-        log_level=CliArgumentParser.LOG_LEVEL_OPTIONS[
-            parser.args['log_level']
-        ],
+        log_level=CliArgumentParser.LOG_LEVEL_OPTIONS[parser.args['log_level']],
     )
 
     match parser.args['command']:
@@ -37,17 +35,13 @@ def main():
             data_lake_setup = parser.extract_data_lake()
             if data_lake_setup is not None:
                 data_lake_type, data_lake_cfg_path = parser.extract_data_lake()
-                data_lake_factory = DataLakeFactory(
-                    data_lake_type, data_lake_cfg_path
-                )
+                data_lake_factory = DataLakeFactory(data_lake_type, data_lake_cfg_path)
             else:
                 data_lake_factory = None
 
             # Data warehouse setup
             warehouse_type, warehouse_cfg_path = parser.extract_etl_loader()
-            etl_loader_factory = EtlLoaderFactory(
-                warehouse_type, warehouse_cfg_path
-            )
+            etl_loader_factory = EtlLoaderFactory(warehouse_type, warehouse_cfg_path)
 
             # Pipeline composition
             data_pipeline = DataPipeline(
@@ -64,12 +58,8 @@ def main():
 
         case 'dashboard':
             provider_type, provider_cfg_path = parser.extract_data_provider()
-            etl_loader_factory = DashboardDataProviderFactory(
-                provider_type, provider_cfg_path
-            )
-            layout_parameters = LayoutTemplateParameters(
-                navbar_label=parser.args['label']
-            )
+            etl_loader_factory = DashboardDataProviderFactory(provider_type, provider_cfg_path)
+            layout_parameters = LayoutTemplateParameters(navbar_label=parser.args['label'])
             app = DashboardApp(etl_loader_factory, layout_parameters)
             app.run(parser.args['with_wsgi'])
 

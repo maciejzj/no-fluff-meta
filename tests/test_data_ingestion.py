@@ -1,9 +1,7 @@
 import datetime as dt
 import json
 
-from it_jobs_meta.data_pipeline.data_ingestion import (
-    NoFluffJobsPostingsDataSource,
-)
+from it_jobs_meta.data_pipeline.data_ingestion import NoFluffJobsPostingsDataSource
 
 
 class MockResponse:

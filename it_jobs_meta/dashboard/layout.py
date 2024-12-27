@@ -53,9 +53,7 @@ def make_navbar(*, label: str | None = None) -> DashComponent:
 
     navbar = dbc.NavbarSimple(
         dbc.NavLink(
-            dbc.Button(
-                [html.I(className='fab fa-github'), ' GitHub'], color='dark'
-            ),
+            dbc.Button([html.I(className='fab fa-github'), ' GitHub'], color='dark'),
             href='https://github.com/maciejzj/no-fluff-meta',
             active=True,
             className='mr-0',
@@ -73,12 +71,8 @@ def make_jumbotron() -> DashComponent:
                 dbc.Col(
                     html.Div(
                         children=[
-                            html.H1(
-                                'Weekly analysis of IT job offers in Poland'
-                            ),
-                            dcc.Markdown(
-                                DashboardTextualComponents.JUMBOTRON_TEXT_MD
-                            ),
+                            html.H1('Weekly analysis of IT job offers in Poland'),
+                            dcc.Markdown(DashboardTextualComponents.JUMBOTRON_TEXT_MD),
                             dbc.Button(
                                 'To the data',
                                 href='#data-section',
@@ -127,9 +121,7 @@ def make_graphs_layout_header(obtained_datetime: datetime) -> DashComponent:
     return div
 
 
-def make_categories_and_seniorities_graphs_layout(
-    graphs: dict[Graph, dcc.Graph]
-) -> DashComponent:
+def make_categories_and_seniorities_graphs_layout(graphs: dict[Graph, dcc.Graph]) -> DashComponent:
     div = html.Div(
         [
             html.H3('Categories and seniorities', className='mt-4'),
@@ -180,9 +172,7 @@ def make_categories_and_seniorities_graphs_layout(
     return div
 
 
-def make_locations_and_remote_graphs_layout(
-    graphs: dict[Graph, dcc.Graph]
-) -> DashComponent:
+def make_locations_and_remote_graphs_layout(graphs: dict[Graph, dcc.Graph]) -> DashComponent:
     div = html.Div(
         [
             html.H3('Locations and remote', className='mt-4'),
@@ -236,9 +226,7 @@ def make_locations_and_remote_graphs_layout(
     return div
 
 
-def make_salaries_breakdown_graphs_layout(
-    graphs: dict[Graph, dcc.Graph]
-) -> DashComponent:
+def make_salaries_breakdown_graphs_layout(graphs: dict[Graph, dcc.Graph]) -> DashComponent:
     div = html.Div(
         [
             html.H3('Salaries breakdown', className='mt-4'),
