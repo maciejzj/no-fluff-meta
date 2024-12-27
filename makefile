@@ -42,9 +42,16 @@ test:
 
 # Cleanup
 
-.PHONY: clean
-clean: 
+.PHONY: clean-logs
+clean-logs:
+	rm -rf var
+
+.PHONY: clean-build
+clean-build:
 	rm -rf $(SRC_DIR).egg-info
+
+.PHONY: clean
+clean: clean-logs clean-build
 
 # Dependencies management
 
