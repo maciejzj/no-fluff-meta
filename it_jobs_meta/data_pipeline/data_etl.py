@@ -1,6 +1,7 @@
 """Data Extraction, Transformations, and Loading for the job postings data."""
 
 import dataclasses
+import uuid
 from abc import ABC, abstractmethod
 from enum import Enum, auto
 from pathlib import Path
@@ -280,7 +281,7 @@ class PandasEtlTransformationEngine(EtlTransformationEngine[pd.DataFrame]):
 
     def replace_values(self, data: pd.DataFrame) -> pd.DataFrame:
         for col in self.VALS_TO_REPLACE:
-            data[col].replace(to_replace=self.VALS_TO_REPLACE[col], inplace=True)
+            data[col] = data[col].replace(to_replace=self.VALS_TO_REPLACE[col])
         return data
 
     def split_on_capitals(self, data: pd.DataFrame) -> pd.DataFrame:
@@ -376,13 +377,16 @@ class PandasEtlMongodbLoadingEngine(EtlLoadingEngine[pd.DataFrame]):
         return cls(**load_yaml_as_dict(config_path))
 
     def load_tables_to_warehouse(self, metadata: pd.DataFrame, data: pd.DataFrame):
-        self._db['metadata'].drop()
-        self._db['postings'].drop()
+        batch_id = str(uuid.uuid4())
 
-        self._db['metadata'].insert_one(metadata.to_dict('records')[0])
-        self._db['postings'].insert_many(
-            data[PandasEtlMongodbLoadingEngine.POSTINGS_TABLE_COLS].reset_index().to_dict('records')
-        )
+        metadata_doc = metadata.to_dict('records')[0]
+        metadata_doc['batch_id'] = batch_id
+        self._db['metadata'].insert_one(metadata_doc)
+
+        postings_docs = data[self.POSTINGS_TABLE_COLS].reset_index().to_dict('records')
+        for posting in postings_docs:
+            posting['batch_id'] = batch_id
+        self._db['postings'].insert_many(postings_docs)
 
 
 class PandasEtlSqlLoadingEngine(EtlLoadingEngine[pd.DataFrame]):
@@ -470,6 +474,4 @@ class EtlLoaderFactory:
             case EtlLoaderImpl.SQL:
                 return PandasEtlSqlLoadingEngine.from_config_file(self._config_path)
             case _:
-                raise ValueError(
-                    'Selected ETL loader implementation is not supported or ' 'invalid'
-                )
+                raise ValueError('Selected ETL loader implementation is not supported or invalid')

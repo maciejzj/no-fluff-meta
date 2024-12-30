@@ -35,6 +35,7 @@ class Geolocator:
         :return: Tuple with location as (unified_city_name, latitude,
             longitude) or None if location failed.
         """
+        return ('Warszawa', 52, 18)
         location = self._geolocator.geocode(city_name, country_codes=self._country_filter)
 
         if location is None:

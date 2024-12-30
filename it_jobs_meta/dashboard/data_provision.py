@@ -3,68 +3,50 @@
 from abc import ABC, abstractmethod
 from enum import Enum, auto
 from pathlib import Path
+from typing import Self
 
 import pandas as pd
-import pymongo
+from pymongo import MongoClient
 
 from it_jobs_meta.common.utils import load_yaml_as_dict
 
 
 class DashboardDataProvider(ABC):
     @abstractmethod
-    def gather_data(self) -> tuple[pd.DataFrame, pd.DataFrame]:
-        """Gather data for the dashboard.
+    def fetch_metadata(self) -> pd.DataFrame:
+        pass
 
-        :return: Tuple with metadata and data dataframes as (metadata_df,
-            data_df)
-        """
+    @abstractmethod
+    def fetch_data(self, batch_id: str) -> pd.DataFrame:
+        pass
 
 
 class MongodbDashboardDataProvider(DashboardDataProvider):
-    def __init__(
-        self,
-        user_name: str,
-        password: str,
-        host: str,
-        db_name: str,
-        port=27017,
-    ):
-        self._db_client: pymongo.MongoClient = pymongo.MongoClient(
-            f'mongodb://{user_name}:{password}@{host}:{port}'
-        )
-        self._db = self._db_client[db_name]
+    def __init__(self, user_name: str, password: str, host: str, db_name: str, port=27017):
+        self.user_name = user_name
+        self.password = password
+        self.host = host
+        self.db_name = db_name
+        self.port = port
 
     @classmethod
-    def from_config_file(cls, config_file_path: Path) -> 'MongodbDashboardDataProvider':
+    def from_config_file(cls, config_file_path: Path) -> Self:
         return cls(**load_yaml_as_dict(config_file_path))
 
-    def gather_data(self) -> tuple[pd.DataFrame, pd.DataFrame]:
-        """Gather data for the dashboard.
+    def fetch_metadata(self) -> pd.DataFrame:
+        with MongoClient(
+            self.host, self.port, username=self.user_name, password=self.password
+        ) as client:
+            db = client[self.db_name]
+            return pd.json_normalize(db['metadata'].find())
 
-        :return: Tuple with metadata and data dataframes as (metadata_df,
-            data_df)
-        """
-        metadata_df = pd.json_normalize(self._db['metadata'].find())
-        postings_df = pd.json_normalize(self._db['postings'].find())
-        if metadata_df.empty or postings_df.empty:
-            raise RuntimeError('Data gather for the dashboard resulted in empty datasets')
-        return metadata_df, postings_df
-
-
-class DashboardProviderImpl(Enum):
-    MONGODB = auto()
-
-
-class DashboardDataProviderFactory:
-    def __init__(self, impl_type: DashboardProviderImpl, config_path: Path):
-        self._impl_type = impl_type
-        self._config_path = config_path
-
-    def make(self) -> DashboardDataProvider:
-        match self._impl_type:
-            case DashboardProviderImpl.MONGODB:
-                return MongodbDashboardDataProvider.from_config_file(self._config_path)
-            case _:
-                raise ValueError(
-                    'Selected data provider implementation is not supported ' 'or invalid'
-                )
+    def fetch_data(self, batch_id: str | None = None) -> pd.DataFrame:
+        with MongoClient(
+            self.host, self.port, username=self.user_name, password=self.password
+        ) as client:
+            db = client[self.db_name]
+            collection = db['postings']
+            if batch_id is not None:
+                return pd.json_normalize(collection.find({'batch_id': batch_id}))
+            else:
+                return pd.json_normalize(collection.find())

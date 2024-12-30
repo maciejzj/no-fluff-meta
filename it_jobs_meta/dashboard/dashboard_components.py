@@ -6,7 +6,7 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
-from dash import dcc
+from dash import Input, Output, callback, dcc
 from plotly import express as px
 from plotly import graph_objects as go
 from sklearn import preprocessing

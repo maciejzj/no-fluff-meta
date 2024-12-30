@@ -4,7 +4,8 @@ from dataclasses import dataclass
 from datetime import datetime
 
 import dash_bootstrap_components as dbc
-from dash import dcc, html
+from dash import Input, Output, callback, dcc, html
+from it_jobs_meta.dashboard.data_provision import DashboardDataProvider
 from dash.development import base_component as DashComponent
 from plotly import graph_objects as go
 
@@ -105,16 +106,18 @@ def make_about() -> DashComponent:
 
 
 def make_graphs_layout_header(obtained_datetime: datetime) -> DashComponent:
-    datetime_str = obtained_datetime.strftime('%-d %B %Y')
+    datetime_str = [t.strftime('%-d %B %Y') for t in obtained_datetime]
+    slider_marks = dict(enumerate(datetime_str))
+
     div = html.Div(
         [
             html.H2('Data', id='data-container'),
-            html.B(f'Last obtained on {datetime_str}'),
             html.P(
                 '''Although this website works fine on mobile devices, it
                 is most convenient to explore more complex graphs on larger
                 screens.'''
             ),
+            dcc.Slider(id="batch-slider", step=None, marks=slider_marks),
         ],
         className='text-center mt-5',
     )
@@ -232,7 +235,7 @@ def make_salaries_breakdown_graphs_layout(graphs: dict[Graph, dcc.Graph]) -> Das
             html.H3('Salaries breakdown', className='mt-4'),
             dbc.Card(
                 graphs[Graph.TECHNOLOGIES_VIOLIN_PLOT],
-                className='mt-4 p-1 border-0 rounded shadow',
+                className='mt-4 p-1 border-0 rounded shadow'
             ),
             dbc.Card(
                 graphs[Graph.CONTRACT_TYPE_VIOLIN_PLOT],
@@ -243,15 +246,21 @@ def make_salaries_breakdown_graphs_layout(graphs: dict[Graph, dcc.Graph]) -> Das
     return div
 
 
+
 def make_graphs_layout(
     obtained_datetime: datetime, graphs: dict[Graph, go.Figure]
 ) -> DashComponent:
     data_section = html.Section(
         [
             make_graphs_layout_header(obtained_datetime),
-            make_categories_and_seniorities_graphs_layout(graphs),
-            make_locations_and_remote_graphs_layout(graphs),
-            make_salaries_breakdown_graphs_layout(graphs),
+            html.Section(
+                [
+                    make_categories_and_seniorities_graphs_layout(graphs),
+                    make_locations_and_remote_graphs_layout(graphs),
+                    make_salaries_breakdown_graphs_layout(graphs),
+                ],
+                id='graphs',
+            ),
         ],
         id='data-section',
     )

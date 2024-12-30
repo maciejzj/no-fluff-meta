@@ -2,11 +2,8 @@
 
 from it_jobs_meta.common.cli import CliArgumentParser
 from it_jobs_meta.common.utils import setup_logging
-from it_jobs_meta.dashboard.dashboard import (
-    DashboardApp,
-    DashboardDataProviderFactory,
-    LayoutTemplateParameters,
-)
+from it_jobs_meta.dashboard.dashboard import DashboardApp, LayoutTemplateParameters
+from it_jobs_meta.dashboard.data_provision import MongodbDashboardDataProvider
 from it_jobs_meta.data_pipeline.data_etl import EtlLoaderFactory
 from it_jobs_meta.data_pipeline.data_ingestion import (
     ArchiveNoFluffJObsPostingsDataSource,
@@ -57,10 +54,10 @@ def main():
                 data_pipeline.run()
 
         case 'dashboard':
-            provider_type, provider_cfg_path = parser.extract_data_provider()
-            etl_loader_factory = DashboardDataProviderFactory(provider_type, provider_cfg_path)
+
+            data_provider = MongodbDashboardDataProvider.from_config_file(parser.args['mongodb'])
             layout_parameters = LayoutTemplateParameters(navbar_label=parser.args['label'])
-            app = DashboardApp(etl_loader_factory, layout_parameters)
+            app = DashboardApp(data_provider, layout_parameters)
             app.run(parser.args['with_wsgi'])
 
 
