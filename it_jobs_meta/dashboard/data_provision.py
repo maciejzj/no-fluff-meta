@@ -60,3 +60,23 @@ class MongodbDashboardDataProvider(DashboardDataProvider):
             if len(df) == 0:
                 raise ValueError('Found no data, dashboard cannot be made')
             return df
+
+    def fetch_field_values_by_count(self, field: str) -> list[str]:
+        client: MongoClient
+        with MongoClient(
+            self.host, self.port, username=self.user_name, password=self.password
+        ) as client:
+            db: Database = client[self.db_name]
+            collection = db['postings']
+
+            return [
+                doc["_id"]
+                for doc in collection.aggregate(
+                    [
+                        {"$match": {field: {"$ne": None}}},
+                        {"$unwind": f"${field}"},
+                        {"$group": {"_id": f"${field}", "count": {"$sum": 1}}},
+                        {"$sort": {"count": -1}},
+                    ]
+                )
+            ]

@@ -7,13 +7,13 @@ from pathlib import Path
 import dash
 import dash_bootstrap_components as dbc
 import pandas as pd
-from dash import Input, Output, callback, dcc, html
+from dash import Input, Output, callback
 from dash.development.base_component import Component as DashComponent
 from flask_caching import Cache as AppCache
 from waitress import serve as wsgi_serve
 
 from it_jobs_meta.common.utils import setup_logging
-from it_jobs_meta.dashboard.dashboard_components import GraphRegistry
+from it_jobs_meta.dashboard.dashboard_components import make_colormap, make_graphs
 from it_jobs_meta.dashboard.data_provision import MongodbDashboardDataProvider
 from it_jobs_meta.dashboard.layout import (
     LayoutDynamicContent,
@@ -35,6 +35,9 @@ class DashboardApp:
         self._data_provider: MongodbDashboardDataProvider = data_provider
         self._layout_template_parameters: LayoutTemplateParameters = layout_template_parameters
         self._cache_timeout: timedelta = cache_timeout
+        self._technologies_cmap: dict[str, str] | None = None
+        self._categories_cmap: dict[str, str] | None = None
+        self._seniorities_cmap: dict[str, str] | None = None
 
     @property
     def app(self) -> dash.Dash:
@@ -69,10 +72,25 @@ class DashboardApp:
         logging.info('Attempting to retrieve data')
         metadata_df = self._data_provider.fetch_metadata()
         data_df = self._data_provider.fetch_data(metadata_df.iloc[-1]['batch_id'])
+        self._technologies_cmap = make_colormap(
+            self._data_provider.fetch_field_values_by_count('technology')
+        )
+        self._categories_cmap = make_colormap(
+            self._data_provider.fetch_field_values_by_count('category')
+        )
+        self._seniorities_cmap = make_colormap(
+            self._data_provider.fetch_field_values_by_count('seniority')
+        )
         logging.info('Data retrieval succeeded')
 
         logging.info('Making layout')
-        dynamic_content = self.make_dynamic_content(metadata_df, data_df)
+        dynamic_content = self.make_dynamic_content(
+            metadata_df,
+            data_df,
+            self._technologies_cmap,
+            self._categories_cmap,
+            self._seniorities_cmap,
+        )
         layout = make_layout(self._layout_template_parameters, dynamic_content)
         logging.info('Making layout succeeded')
         logging.info('Rendering dashboard succeeded')
@@ -87,7 +105,9 @@ class DashboardApp:
         def update_graphs_section(value):
             metadata_df = self._data_provider.fetch_metadata()
             data_df = self._data_provider.fetch_data(metadata_df.iloc[value]['batch_id'])
-            graphs = GraphRegistry.make(data_df)
+            graphs = make_graphs(
+                data_df, self._technologies_cmap, self._categories_cmap, self._seniorities_cmap
+            )
             return make_graphs_layout(graphs)
 
     def run(self, with_wsgi=False):
@@ -109,10 +129,14 @@ class DashboardApp:
 
     @staticmethod
     def make_dynamic_content(
-        metadata_df: pd.DataFrame, data_df: pd.DataFrame
+        metadata_df: pd.DataFrame,
+        data_df: pd.DataFrame,
+        technologies_cmap: dict[str, str],
+        categories_cmap: dict[str, str],
+        seniorities_cmap: dict[str, str],
     ) -> LayoutDynamicContent:
         obtained_datetime = metadata_df['obtained_datetime']
-        graphs = GraphRegistry.make(data_df)
+        graphs = make_graphs(data_df, technologies_cmap, categories_cmap, seniorities_cmap)
         return LayoutDynamicContent(obtained_datetime=obtained_datetime, graphs=graphs)
 
 

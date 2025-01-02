@@ -123,7 +123,7 @@ def make_timeline_slider(obtained_datetime) -> DashComponent:
     slider_marks = dict(enumerate([t.strftime('%b %Y') for t in obtained_datetime]))
     return dcc.Slider(
         id='batch-slider',
-        className='text-nowrap mx-3 my-5',
+        className='text-nowrap sticky-top bg-white mx-4 my-3 p-5 rounded-pill shadow',
         step=None,
         marks=slider_marks,
         value=len(slider_marks) - 1,
