@@ -5,6 +5,8 @@ from datetime import datetime
 
 import pandera as pa
 
+# SQL schemas
+
 
 @dataclass
 class Schemas:
@@ -45,3 +47,63 @@ class Schemas:
     )
 
     seniorities = pa.DataFrameSchema({'id': pa.Column(str), 'seniority': pa.Column(str)})
+
+
+# NoSQL schemas
+
+
+METADATA_JSON_SCEHMA = {
+    "bsonType": "object",
+    "required": ["source_name", "obtained_datetime", "batch_id"],
+    "properties": {
+        "source_name": {"bsonType": "string"},
+        "obtained_datetime": {"bsonType": "date"},
+        "batch_id": {"bsonType": "string"},
+    },
+}
+
+
+POSTINGS_JSON_SCHEMA = {
+    "bsonType": "object",
+    "required": [
+        "name",
+        "posted",
+        "title",
+        "technology",
+        "category",
+        "remote",
+        "contract_type",
+        "salary_min",
+        "salary_max",
+        "salary_mean",
+        "city",
+        "seniority",
+        "batch_id",
+    ],
+    "properties": {
+        "name": {"bsonType": "string"},
+        "posted": {"bsonType": "long"},
+        "title": {"bsonType": "string"},
+        "technology": {"bsonType": ["string", "null"]},
+        "category": {"bsonType": "string"},
+        "remote": {"bsonType": "bool"},
+        "contract_type": {"bsonType": "string"},
+        "salary_min": {"bsonType": ["double", "int"]},
+        "salary_max": {"bsonType": ["double", "int"]},
+        "salary_mean": {"bsonType": ["double", "int"]},
+        "city": {
+            "bsonType": "array",
+            "items": {
+                "bsonType": "array",
+                # City name, latitude, longitude
+                "items": [
+                    {"bsonType": "string"},
+                    {"bsonType": ["double", "int"]},
+                    {"bsonType": ["double", "int"]},
+                ],
+            },
+        },
+        "seniority": {"bsonType": "array", "items": {"bsonType": "string"}},
+        "batch_id": {"bsonType": "string"},
+    },
+}

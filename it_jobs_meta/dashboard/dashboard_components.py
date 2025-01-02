@@ -6,7 +6,7 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
-from dash import Input, Output, callback, dcc
+from dash import dcc
 from plotly import express as px
 from plotly import graph_objects as go
 from sklearn import preprocessing
@@ -111,8 +111,10 @@ class TechnologiesPieChart(GraphFigure):
         tech_most_freq_df = get_rows_with_n_most_frequent_vals_in_col(
             postings_df, 'technology', cls.N_MOST_FREQ
         )
+        technology_counts = tech_most_freq_df['technology'].value_counts().reset_index()
+        technology_counts.columns = ['technology', 'count']
 
-        fig = px.pie(tech_most_freq_df, names='technology', title=cls.TITLE)
+        fig = px.pie(technology_counts, names='technology', values='count', title=cls.TITLE)
         fig.update_traces(textposition='inside')
         fig = center_title(fig)
         return fig
@@ -125,11 +127,15 @@ class CategoriesPieChart(GraphFigure):
 
     @classmethod
     def make_fig(cls, postings_df: pd.DataFrame) -> go.Figure:
+        # Get the most frequent categories and their counts
         cat_largest_df = get_rows_with_n_most_frequent_vals_in_col(
             postings_df, 'category', cls.N_MOST_FREQ
         )
+        category_counts = cat_largest_df['category'].value_counts().reset_index()
+        category_counts.columns = ['category', 'count']
 
-        fig = px.pie(cat_largest_df, names='category', title=cls.TITLE)
+        # Create a pie chart with count values
+        fig = px.pie(category_counts, names='category', values='count', title=cls.TITLE)
         fig.update_traces(textposition='inside')
         fig = center_title(fig)
         return fig
@@ -193,7 +199,9 @@ class SeniorityPieChart(GraphFigure):
     @classmethod
     def make_fig(cls, postings_df: pd.DataFrame) -> go.Figure:
         postings_df = postings_df.explode('seniority')
-        fig = px.pie(postings_df, names='seniority', title=cls.TITLE)
+        seniority_counts = postings_df['seniority'].value_counts().reset_index()
+        seniority_counts.columns = ['seniority', 'count']
+        fig = px.pie(seniority_counts, values='count', names='seniority', title=cls.TITLE)
         fig = center_title(fig)
         return fig
 
@@ -252,6 +260,7 @@ class SalariesMap(GraphFigure):
         )
         job_counts = postings_df.groupby('city')['_id'].count()
         salaries = postings_df.groupby('city')[['salary_mean', 'lat', 'lon']].mean()
+        salaries['salary_mean'] = salaries['salary_mean'].round()
         cities_salaries = pd.concat([job_counts.rename('job_counts'), salaries], axis=1)
         cities_salaries = cities_salaries.reset_index()
 

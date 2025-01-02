@@ -54,7 +54,6 @@ def main():
                 data_pipeline.run()
 
         case 'dashboard':
-
             data_provider = MongodbDashboardDataProvider.from_config_file(parser.args['mongodb'])
             layout_parameters = LayoutTemplateParameters(navbar_label=parser.args['label'])
             app = DashboardApp(data_provider, layout_parameters)

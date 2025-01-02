@@ -1,12 +1,12 @@
 """Data provision and data source for the data dashboard."""
 
 from abc import ABC, abstractmethod
-from enum import Enum, auto
 from pathlib import Path
 from typing import Self
 
 import pandas as pd
 from pymongo import MongoClient
+from pymongo.synchronous.database import Database
 
 from it_jobs_meta.common.utils import load_yaml_as_dict
 
@@ -34,19 +34,29 @@ class MongodbDashboardDataProvider(DashboardDataProvider):
         return cls(**load_yaml_as_dict(config_file_path))
 
     def fetch_metadata(self) -> pd.DataFrame:
+        client: MongoClient
         with MongoClient(
             self.host, self.port, username=self.user_name, password=self.password
         ) as client:
-            db = client[self.db_name]
-            return pd.json_normalize(db['metadata'].find())
+            db: Database = client[self.db_name]
+            df = pd.json_normalize(db['metadata'].find().sort('obtained_datetime'))
+            if len(df) == 0:
+                raise ValueError('Found no metadata, dashboard cannot be made')
+            return df
 
     def fetch_data(self, batch_id: str | None = None) -> pd.DataFrame:
+        client: MongoClient
         with MongoClient(
             self.host, self.port, username=self.user_name, password=self.password
         ) as client:
-            db = client[self.db_name]
+            db: Database = client[self.db_name]
             collection = db['postings']
+
             if batch_id is not None:
-                return pd.json_normalize(collection.find({'batch_id': batch_id}))
+                df = pd.json_normalize(collection.find({'batch_id': batch_id}))
             else:
-                return pd.json_normalize(collection.find())
+                df = pd.json_normalize(collection.find())
+
+            if len(df) == 0:
+                raise ValueError('Found no data, dashboard cannot be made')
+            return df

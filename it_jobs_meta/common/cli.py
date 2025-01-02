@@ -5,7 +5,6 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from it_jobs_meta.dashboard.data_provision import DashboardDataProvider
 from it_jobs_meta.data_pipeline.data_etl import EtlLoaderImpl
 from it_jobs_meta.data_pipeline.data_lake import DataLakeImpl
 

@@ -8,7 +8,7 @@ import dash
 import dash_bootstrap_components as dbc
 import pandas as pd
 from dash import Input, Output, callback, dcc, html
-from dash.development import base_component as DashComponent
+from dash.development.base_component import Component as DashComponent
 from flask_caching import Cache as AppCache
 from waitress import serve as wsgi_serve
 
@@ -18,10 +18,8 @@ from it_jobs_meta.dashboard.data_provision import MongodbDashboardDataProvider
 from it_jobs_meta.dashboard.layout import (
     LayoutDynamicContent,
     LayoutTemplateParameters,
-    make_categories_and_seniorities_graphs_layout,
+    make_graphs_layout,
     make_layout,
-    make_locations_and_remote_graphs_layout,
-    make_salaries_breakdown_graphs_layout,
 )
 
 
@@ -62,18 +60,15 @@ class DashboardApp:
         if self._cache is None:
             self._cache = AppCache(
                 self.app.server,
-                config={
-                    'CACHE_TYPE': 'SimpleCache',
-                    'CACHE_THRESHOLD': 2,
-                },
+                config={'CACHE_TYPE': 'SimpleCache', 'CACHE_THRESHOLD': 2},
             )
         return self._cache
 
-    def render_layout(self) -> DashComponent:
+    def make_layout(self) -> DashComponent:
         logging.info('Rendering dashboard')
         logging.info('Attempting to retrieve data')
-        metadata_df =self._data_provider.fetch_metadata()
-        data_df = self._data_provider.fetch_data()
+        metadata_df = self._data_provider.fetch_metadata()
+        data_df = self._data_provider.fetch_data(metadata_df.iloc[-1]['batch_id'])
         logging.info('Data retrieval succeeded')
 
         logging.info('Making layout')
@@ -87,24 +82,19 @@ class DashboardApp:
         @callback(
             Output('graphs', 'children'),
             Input('batch-slider', 'value'),
-            prevent_initial_callback=True,
+            prevent_initial_call=True,
         )
         def update_graphs_section(value):
             metadata_df = self._data_provider.fetch_metadata()
             data_df = self._data_provider.fetch_data(metadata_df.iloc[value]['batch_id'])
-            dynamic_content = self.make_dynamic_content(metadata_df, data_df)
-            graphs = dynamic_content.graphs
-            return [
-                make_categories_and_seniorities_graphs_layout(graphs),
-                make_locations_and_remote_graphs_layout(graphs),
-                make_salaries_breakdown_graphs_layout(graphs),
-            ]
+            graphs = GraphRegistry.make(data_df)
+            return make_graphs_layout(graphs)
 
     def run(self, with_wsgi=False):
         try:
             render_layout_memoized = self.cache.memoize(
                 timeout=int(self._cache_timeout.total_seconds())
-            )(self.render_layout)
+            )(self.make_layout)
             self.app.layout = render_layout_memoized
             self.register_callbacks()
 
@@ -131,7 +121,7 @@ def main():
     setup_logging()
     layout_params = LayoutTemplateParameters()
     data_provider = MongodbDashboardDataProvider.from_config_file(Path('config/mongodb_config.yml'))
-    app = DashboardApp(layout_params, data_provider, cache_timeout=timedelta(seconds=30))
+    app = DashboardApp(data_provider, layout_params, cache_timeout=timedelta(seconds=5))
     app.run()
 
 
