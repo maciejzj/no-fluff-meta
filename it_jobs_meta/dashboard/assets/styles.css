@@ -11,6 +11,10 @@ p a:hover {
     color: rgb(33, 37, 41);
 }
 
+.sticky-top {
+    top: 1em;
+}
+
 ._dash-loading {
     width: 0;
     height: 0;

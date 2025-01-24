@@ -1,70 +1,82 @@
 """Data provision and data source for the data dashboard."""
 
 from abc import ABC, abstractmethod
-from enum import Enum, auto
 from pathlib import Path
+from typing import Self
 
 import pandas as pd
-import pymongo
+from pymongo import MongoClient
+from pymongo.synchronous.database import Database
 
 from it_jobs_meta.common.utils import load_yaml_as_dict
 
 
 class DashboardDataProvider(ABC):
     @abstractmethod
-    def gather_data(self) -> tuple[pd.DataFrame, pd.DataFrame]:
-        """Gather data for the dashboard.
+    def fetch_metadata(self) -> pd.DataFrame:
+        pass
 
-        :return: Tuple with metadata and data dataframes as (metadata_df,
-            data_df)
-        """
+    @abstractmethod
+    def fetch_data(self, batch_id: str) -> pd.DataFrame:
+        pass
 
 
 class MongodbDashboardDataProvider(DashboardDataProvider):
-    def __init__(
-        self,
-        user_name: str,
-        password: str,
-        host: str,
-        db_name: str,
-        port=27017,
-    ):
-        self._db_client: pymongo.MongoClient = pymongo.MongoClient(
-            f'mongodb://{user_name}:{password}@{host}:{port}'
-        )
-        self._db = self._db_client[db_name]
+    def __init__(self, user_name: str, password: str, host: str, db_name: str, port=27017):
+        self.user_name = user_name
+        self.password = password
+        self.host = host
+        self.db_name = db_name
+        self.port = port
 
     @classmethod
-    def from_config_file(cls, config_file_path: Path) -> 'MongodbDashboardDataProvider':
+    def from_config_file(cls, config_file_path: Path) -> Self:
         return cls(**load_yaml_as_dict(config_file_path))
 
-    def gather_data(self) -> tuple[pd.DataFrame, pd.DataFrame]:
-        """Gather data for the dashboard.
+    def fetch_metadata(self) -> pd.DataFrame:
+        client: MongoClient
+        with MongoClient(
+            self.host, self.port, username=self.user_name, password=self.password
+        ) as client:
+            db: Database = client[self.db_name]
+            df = pd.json_normalize(db['metadata'].find().sort('obtained_datetime'))
+            if len(df) == 0:
+                raise ValueError('Found no metadata, dashboard cannot be made')
+            return df
 
-        :return: Tuple with metadata and data dataframes as (metadata_df,
-            data_df)
-        """
-        metadata_df = pd.json_normalize(self._db['metadata'].find())
-        postings_df = pd.json_normalize(self._db['postings'].find())
-        if metadata_df.empty or postings_df.empty:
-            raise RuntimeError('Data gather for the dashboard resulted in empty datasets')
-        return metadata_df, postings_df
+    def fetch_data(self, batch_id: str | None = None) -> pd.DataFrame:
+        client: MongoClient
+        with MongoClient(
+            self.host, self.port, username=self.user_name, password=self.password
+        ) as client:
+            db: Database = client[self.db_name]
+            collection = db['postings']
 
+            if batch_id is not None:
+                df = pd.json_normalize(collection.find({'batch_id': batch_id}))
+            else:
+                df = pd.json_normalize(collection.find())
 
-class DashboardProviderImpl(Enum):
-    MONGODB = auto()
+            if len(df) == 0:
+                raise ValueError('Found no data, dashboard cannot be made')
+            return df
 
+    def fetch_field_values_by_count(self, field: str) -> list[str]:
+        client: MongoClient
+        with MongoClient(
+            self.host, self.port, username=self.user_name, password=self.password
+        ) as client:
+            db: Database = client[self.db_name]
+            collection = db['postings']
 
-class DashboardDataProviderFactory:
-    def __init__(self, impl_type: DashboardProviderImpl, config_path: Path):
-        self._impl_type = impl_type
-        self._config_path = config_path
-
-    def make(self) -> DashboardDataProvider:
-        match self._impl_type:
-            case DashboardProviderImpl.MONGODB:
-                return MongodbDashboardDataProvider.from_config_file(self._config_path)
-            case _:
-                raise ValueError(
-                    'Selected data provider implementation is not supported ' 'or invalid'
+            return [
+                doc["_id"]
+                for doc in collection.aggregate(
+                    [
+                        {"$match": {field: {"$ne": None}}},
+                        {"$unwind": f"${field}"},
+                        {"$group": {"_id": f"${field}", "count": {"$sum": 1}}},
+                        {"$sort": {"count": -1}},
+                    ]
                 )
+            ]

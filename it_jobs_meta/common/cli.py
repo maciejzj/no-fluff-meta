@@ -5,7 +5,6 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from it_jobs_meta.dashboard.dashboard import DashboardProviderImpl
 from it_jobs_meta.data_pipeline.data_etl import EtlLoaderImpl
 from it_jobs_meta.data_pipeline.data_lake import DataLakeImpl
 
@@ -77,21 +76,6 @@ class CliArgumentParser:
                 raise ValueError(
                     'Parsed arguments resulted in unsupported or invalid ETL '
                     'loader configuration'
-                )
-
-    def extract_data_provider(self) -> tuple[DashboardProviderImpl, Path]:
-        """Get the dashboard data provider setup from the arguments.
-
-        :return: Tuple with the selected data provider implementation type and
-            the config path.
-        """
-        match self.args:
-            case {'mongodb': Path()}:
-                return DashboardProviderImpl.MONGODB, self.args['mongodb']
-            case _:
-                raise ValueError(
-                    'Parsed arguments resulted in unsupported or invalid '
-                    'dashboard data provider configuration'
                 )
 
     def _build_main_command(self):

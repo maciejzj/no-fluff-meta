@@ -20,7 +20,7 @@ class Geolocator:
         self._country_filter = country_filter
 
     @functools.cache
-    @retry(TimeoutError, tries=3, delay=10)
+    @retry(TimeoutError, tries=5, delay=1, backoff=2)
     @throttle(0.1)
     def __call__(self, city_name: str) -> tuple[str, float, float] | None:
         """Call to get_universal_city_name_lat_lon method."""

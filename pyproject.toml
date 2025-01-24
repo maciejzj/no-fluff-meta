@@ -62,6 +62,9 @@ build-backend = "setuptools.build_meta"
 packages = [ "it_jobs_meta" ]
 include-package-data = true
 
+[tool.setuptools.dynamic]
+version = {attr = "it_jobs_meta.__version__"}
+
 [tool.setuptools.package-data]
 "it_jobs_meta" = ["dashboard/assets/*.css"]
 
@@ -71,7 +74,7 @@ it-jobs-meta = "it_jobs_meta.__main__:main"
 
 # Development tools
 [pytest.tool]
-testpaths = [ "it_jobs_meta" ]
+testpaths = [ "tests" ]
 
 [tool.mypy]
 ignore_missing_imports = true
