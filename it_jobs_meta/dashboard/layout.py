@@ -253,6 +253,7 @@ def make_salaries_breakdown_graphs_layout(graphs: dict[Graph, dcc.Graph]) -> Das
 
 def make_graphs_layout(graphs: dict[Graph, go.Figure]) -> list[DashComponent]:
     return [
+        graphs[Graph.TECHNOLOGIES_OVER_TIME],
         make_categories_and_seniorities_graphs_layout(graphs),
         make_locations_and_remote_graphs_layout(graphs),
         make_salaries_breakdown_graphs_layout(graphs),

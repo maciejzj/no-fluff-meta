@@ -83,10 +83,19 @@ class DashboardApp:
         )
         logging.info('Data retrieval succeeded')
 
+        technologies_over_time_df = self._data_provider.fetch_field_count_over_time('technology')
+        categories_over_time_df = self._data_provider.fetch_field_count_over_time('category')
+        remote_over_time_df = self._data_provider.fetch_field_count_over_time('remote')
+        seniority_over_time_df = self._data_provider.fetch_field_count_over_time('seniority')
+
         logging.info('Making layout')
         dynamic_content = self.make_dynamic_content(
             metadata_df,
             data_df,
+            technologies_over_time_df,
+            categories_over_time_df,
+            remote_over_time_df,
+            seniority_over_time_df,
             self._technologies_cmap,
             self._categories_cmap,
             self._seniorities_cmap,
@@ -131,12 +140,25 @@ class DashboardApp:
     def make_dynamic_content(
         metadata_df: pd.DataFrame,
         data_df: pd.DataFrame,
+        technologies_over_time_df: pd.DataFrame,
+        categories_over_time_df: pd.DataFrame,
+        remote_over_time_df: pd.DataFrame,
+        seniority_over_time_df: pd.DataFrame,
         technologies_cmap: dict[str, str],
         categories_cmap: dict[str, str],
         seniorities_cmap: dict[str, str],
     ) -> LayoutDynamicContent:
         obtained_datetime = metadata_df['obtained_datetime']
-        graphs = make_graphs(data_df, technologies_cmap, categories_cmap, seniorities_cmap)
+        graphs = make_graphs(
+            data_df,
+            technologies_over_time_df,
+            categories_over_time_df,
+            remote_over_time_df,
+            seniority_over_time_df,
+            technologies_cmap,
+            categories_cmap,
+            seniorities_cmap,
+        )
         return LayoutDynamicContent(obtained_datetime=obtained_datetime, graphs=graphs)
 
 

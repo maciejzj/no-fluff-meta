@@ -63,9 +63,39 @@ class Graph(Enum):
     SALARIES_MAP_MID = auto()
     SALARIES_MAP_SENIOR = auto()
 
+    TECHNOLOGIES_OVER_TIME = auto()
+
+
+class TechnologiesOverTime:
+    @classmethod
+    def make_fig(
+        cls, technologies_over_time_df: pd.DataFrame, cmap: dict[str, str] | None = None
+    ) -> go.Figure:
+
+        top_technologies_per_time = (
+            technologies_over_time_df.sort_values(
+                ["obtained_datetime", "count"], ascending=[True, False]
+            )
+            .groupby("obtained_datetime")
+            .head(10)
+        )
+
+        fig = px.line(
+            top_technologies_per_time,
+            x="obtained_datetime",
+            y="salary_mean",
+            color="technology",
+            color_discrete_map=cmap,
+        )
+        return fig
+
 
 def make_graphs(
     postings_df: pd.DataFrame,
+    technologies_over_time_df: pd.DataFrame,
+    categories_over_time_df: pd.DataFrame,
+    remote_over_time_df: pd.DataFrame,
+    seniority_over_time_df: pd.DataFrame,
     technologies_cmap: dict[str, str],
     categories_cmap: dict[str, str],
     seniorities_cmap: dict[str, str],
@@ -85,6 +115,9 @@ def make_graphs(
         Graph.SALARIES_MAP_JUNIOR: SalariesMapJunior.make_fig(postings_df),
         Graph.SALARIES_MAP_MID: SalariesMapMid.make_fig(postings_df),
         Graph.SALARIES_MAP_SENIOR: SalariesMapSenior.make_fig(postings_df),
+        Graph.TECHNOLOGIES_OVER_TIME: TechnologiesOverTime.make_fig(
+            technologies_over_time_df, technologies_cmap
+        ),
     }
 
     graphs = {graph_key: dcc.Graph(figure=figures[graph_key]) for graph_key in figures}

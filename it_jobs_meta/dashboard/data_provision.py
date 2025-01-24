@@ -61,6 +61,60 @@ class MongodbDashboardDataProvider(DashboardDataProvider):
                 raise ValueError('Found no data, dashboard cannot be made')
             return df
 
+    def fetch_field_count_over_time(self, field: str) -> pd.DataFrame:
+        client: MongoClient
+        with MongoClient(
+            self.host, self.port, username=self.user_name, password=self.password
+        ) as client:
+            db: Database = client[self.db_name]
+            collection = db['postings']
+
+            return pd.json_normalize(
+                collection.aggregate(
+                    [
+                        # Explode multi-value fields
+                        {
+                            "$unwind": f"${field}",
+                        },
+                        # Group and count in respect to the field and batch id
+                        {
+                            "$group": {
+                                "_id": {"batch_id": "$batch_id", field: f"${field}"},
+                                "count": {"$count": {}},
+                                "salary_mean": { "$avg": "$salary_mean" }
+                            }
+                        },
+                        # Join with the metadata collection to get the obtained_datetime
+                        {
+                            "$lookup": {
+                                "from": "metadata",
+                                "localField": f"_id.batch_id",
+                                "foreignField": "batch_id",
+                                "as": "metadata",
+                            }
+                        },
+                        # Replace batch_id with obtained_datetime
+                        {
+                            "$addFields": {
+                                "obtained_datetime": {
+                                    "$arrayElemAt": ["$metadata.obtained_datetime", 0]
+                                }
+                            }
+                        },
+                        # Reshape the output document
+                        {
+                            "$project": {
+                                field: f"$_id.{field}",
+                                "count": 1,
+                                "obtained_datetime": 1,
+                                "salary_mean": 1,
+                                "_id": 0.0,
+                            }
+                        },
+                    ]
+                )
+            )
+
     def fetch_field_values_by_count(self, field: str) -> list[str]:
         client: MongoClient
         with MongoClient(
@@ -75,8 +129,7 @@ class MongodbDashboardDataProvider(DashboardDataProvider):
                     [
                         {"$match": {field: {"$ne": None}}},
                         {"$unwind": f"${field}"},
-                        {"$group": {"_id": f"${field}", "count": {"$sum": 1}}},
-                        {"$sort": {"count": -1}},
+                        {"$sortByCount": f"${field}"},
                     ]
                 )
             ]
