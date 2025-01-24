@@ -257,7 +257,9 @@ class RemotePieChart:
     def make_fig(cls, postings_df: pd.DataFrame) -> go.Figure:
         remote_df = postings_df['remote'].replace({True: 'Yes', False: 'No'})
 
-        fig = px.pie(remote_df, names='remote', title=cls.TITLE)
+        fig = px.pie(
+            remote_df, names='remote', title=cls.TITLE, category_orders={'remote': ['Yes', 'No']}
+        )
         fig = center_title(fig)
         return fig
 
