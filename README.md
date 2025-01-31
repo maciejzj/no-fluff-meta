@@ -189,7 +189,7 @@ Tools configuration is stored in the `pyproject.toml` file.
 The application is not bound to any specific deployment environment; however,
 AWS is used for running the main instance. The setup for creating AWS
 infrastructure for the application using Terraform and Ansible deployment is
-placed int the `deployment` directory. 
+placed int the `deployment` directory.
 
 ## License
 

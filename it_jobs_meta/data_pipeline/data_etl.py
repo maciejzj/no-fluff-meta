@@ -1,18 +1,23 @@
 """Data Extraction, Transformations, and Loading for the job postings data."""
 
 import dataclasses
+import uuid
 from abc import ABC, abstractmethod
 from enum import Enum, auto
 from pathlib import Path
 from typing import Generic, TypeVar
 
 import pandas as pd
-import pymongo
 import sqlalchemy as db
+from pymongo import MongoClient
 
 from it_jobs_meta.common.utils import load_yaml_as_dict
 from it_jobs_meta.data_pipeline.data_formats import NoFluffJObsPostingsData
-from it_jobs_meta.data_pipeline.data_validation import Schemas
+from it_jobs_meta.data_pipeline.data_validation import (
+    METADATA_JSON_SCEHMA,
+    POSTINGS_JSON_SCHEMA,
+    Schemas,
+)
 from it_jobs_meta.data_pipeline.geolocator import Geolocator
 
 # Data type used internally by the data transformation pipeline.
@@ -98,6 +103,11 @@ class EtlTransformationEngine(Generic[ProcessDataType], ABC):
             'javascript': 'JavaScript',
             'php': 'PHP',
             'sql': 'SQL',
+            'api': 'API',
+            'ci': 'CI',
+            'cd': 'CD',
+            'ci/cd': 'CI/CD',
+            'c/c++': 'C/C++',
         },
         'contract_type': {
             'b2b': 'B2B',
@@ -275,12 +285,12 @@ class PandasEtlTransformationEngine(EtlTransformationEngine[pd.DataFrame]):
 
     def unify_to_lower(self, data: pd.DataFrame) -> pd.DataFrame:
         for col in self.COLS_TO_LOWER:
-            data[col] = data[col].str.lower()
+            data[col] = data[col].str.lower().str.strip()
         return data
 
     def replace_values(self, data: pd.DataFrame) -> pd.DataFrame:
         for col in self.VALS_TO_REPLACE:
-            data[col].replace(to_replace=self.VALS_TO_REPLACE[col], inplace=True)
+            data[col] = data[col].replace(to_replace=self.VALS_TO_REPLACE[col])
         return data
 
     def split_on_capitals(self, data: pd.DataFrame) -> pd.DataFrame:
@@ -339,35 +349,14 @@ class PandasEtlTransformationEngine(EtlTransformationEngine[pd.DataFrame]):
         data = data.replace('NaN', None)
         data = data.replace('Nan', None)
         data = data.replace('nan', None)
+        data = data.replace(float('nan'), None)
         return data
 
 
 class PandasEtlMongodbLoadingEngine(EtlLoadingEngine[pd.DataFrame]):
-    POSTINGS_TABLE_COLS = [
-        'name',
-        'posted',
-        'title',
-        'technology',
-        'category',
-        'remote',
-        'contract_type',
-        'salary_min',
-        'salary_max',
-        'salary_mean',
-        'city',
-        'seniority',
-    ]
-
-    def __init__(
-        self,
-        user_name: str,
-        password: str,
-        host: str,
-        db_name: str,
-        port=27017,
-    ):
-        self._db_client: pymongo.MongoClient = pymongo.MongoClient(
-            f'mongodb://{user_name}:{password}@{host}:{port}'
+    def __init__(self, user_name: str, password: str, host: str, db_name: str, port=27017):
+        self._db_client: MongoClient = MongoClient(
+            host, port, username=user_name, password=password
         )
         self._db = self._db_client[db_name]
 
@@ -375,14 +364,23 @@ class PandasEtlMongodbLoadingEngine(EtlLoadingEngine[pd.DataFrame]):
     def from_config_file(cls, config_path: Path) -> 'PandasEtlMongodbLoadingEngine':
         return cls(**load_yaml_as_dict(config_path))
 
-    def load_tables_to_warehouse(self, metadata: pd.DataFrame, data: pd.DataFrame):
-        self._db['metadata'].drop()
-        self._db['postings'].drop()
+    def setup_warehouse(self):
+        if 'metadata' not in self._db.list_collection_names():
+            self._db.create_collection('metadata', validator={'$jsonSchema': METADATA_JSON_SCEHMA})
+        if 'postings' not in self._db.list_collection_names():
+            self._db.create_collection('postings', validator={"$jsonSchema": POSTINGS_JSON_SCHEMA})
 
-        self._db['metadata'].insert_one(metadata.to_dict('records')[0])
-        self._db['postings'].insert_many(
-            data[PandasEtlMongodbLoadingEngine.POSTINGS_TABLE_COLS].reset_index().to_dict('records')
-        )
+    def load_tables_to_warehouse(self, metadata: pd.DataFrame, data: pd.DataFrame):
+        self.setup_warehouse()
+        batch_id = str(uuid.uuid4())
+
+        metadata['batch_id'] = batch_id
+        metadata_doc = metadata.to_dict('records')[0]
+        self._db['metadata'].insert_one(metadata_doc)
+
+        data['batch_id'] = batch_id
+        postings_docs = data.to_dict('records')
+        self._db['postings'].insert_many(postings_docs)
 
 
 class PandasEtlSqlLoadingEngine(EtlLoadingEngine[pd.DataFrame]):
@@ -470,6 +468,4 @@ class EtlLoaderFactory:
             case EtlLoaderImpl.SQL:
                 return PandasEtlSqlLoadingEngine.from_config_file(self._config_path)
             case _:
-                raise ValueError(
-                    'Selected ETL loader implementation is not supported or ' 'invalid'
-                )
+                raise ValueError('Selected ETL loader implementation is not supported or invalid')

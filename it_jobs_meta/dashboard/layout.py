@@ -5,7 +5,7 @@ from datetime import datetime
 
 import dash_bootstrap_components as dbc
 from dash import dcc, html
-from dash.development import base_component as DashComponent
+from dash.development.base_component import Component as DashComponent
 from plotly import graph_objects as go
 
 from it_jobs_meta.dashboard.dashboard_components import Graph
@@ -104,12 +104,10 @@ def make_about() -> DashComponent:
     return about
 
 
-def make_graphs_layout_header(obtained_datetime: datetime) -> DashComponent:
-    datetime_str = obtained_datetime.strftime('%-d %B %Y')
+def make_graphs_layout_header() -> DashComponent:
     div = html.Div(
         [
             html.H2('Data', id='data-container'),
-            html.B(f'Last obtained on {datetime_str}'),
             html.P(
                 '''Although this website works fine on mobile devices, it
                 is most convenient to explore more complex graphs on larger
@@ -119,6 +117,17 @@ def make_graphs_layout_header(obtained_datetime: datetime) -> DashComponent:
         className='text-center mt-5',
     )
     return div
+
+
+def make_timeline_slider(obtained_datetime) -> DashComponent:
+    slider_marks = dict(enumerate([t.strftime('%b %Y') for t in obtained_datetime]))
+    return dcc.Slider(
+        id='batch-slider',
+        className='text-nowrap sticky-top bg-white mx-4 my-3 p-5 rounded-pill shadow',
+        step=None,
+        marks=slider_marks,
+        value=len(slider_marks) - 1,
+    )
 
 
 def make_categories_and_seniorities_graphs_layout(graphs: dict[Graph, dcc.Graph]) -> DashComponent:
@@ -231,8 +240,7 @@ def make_salaries_breakdown_graphs_layout(graphs: dict[Graph, dcc.Graph]) -> Das
         [
             html.H3('Salaries breakdown', className='mt-4'),
             dbc.Card(
-                graphs[Graph.TECHNOLOGIES_VIOLIN_PLOT],
-                className='mt-4 p-1 border-0 rounded shadow',
+                graphs[Graph.TECHNOLOGIES_VIOLIN_PLOT], className='mt-4 p-1 border-0 rounded shadow'
             ),
             dbc.Card(
                 graphs[Graph.CONTRACT_TYPE_VIOLIN_PLOT],
@@ -243,15 +251,22 @@ def make_salaries_breakdown_graphs_layout(graphs: dict[Graph, dcc.Graph]) -> Das
     return div
 
 
-def make_graphs_layout(
+def make_graphs_layout(graphs: dict[Graph, go.Figure]) -> list[DashComponent]:
+    return [
+        make_categories_and_seniorities_graphs_layout(graphs),
+        make_locations_and_remote_graphs_layout(graphs),
+        make_salaries_breakdown_graphs_layout(graphs),
+    ]
+
+
+def make_data_section_layout(
     obtained_datetime: datetime, graphs: dict[Graph, go.Figure]
 ) -> DashComponent:
     data_section = html.Section(
         [
-            make_graphs_layout_header(obtained_datetime),
-            make_categories_and_seniorities_graphs_layout(graphs),
-            make_locations_and_remote_graphs_layout(graphs),
-            make_salaries_breakdown_graphs_layout(graphs),
+            make_graphs_layout_header(),
+            make_timeline_slider(obtained_datetime),
+            html.Div(make_graphs_layout(graphs), id='graphs'),
         ],
         id='data-section',
     )
@@ -286,7 +301,7 @@ def make_layout(
                 [
                     make_jumbotron(),
                     make_about(),
-                    make_graphs_layout(
+                    make_data_section_layout(
                         dynamic_content.obtained_datetime,
                         dynamic_content.graphs,
                     ),

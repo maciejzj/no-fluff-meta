@@ -7,19 +7,18 @@ from pathlib import Path
 import dash
 import dash_bootstrap_components as dbc
 import pandas as pd
-from dash.development import base_component as DashComponent
+from dash import Input, Output, callback
+from dash.development.base_component import Component as DashComponent
 from flask_caching import Cache as AppCache
 from waitress import serve as wsgi_serve
 
 from it_jobs_meta.common.utils import setup_logging
-from it_jobs_meta.dashboard.dashboard_components import GraphRegistry
-from it_jobs_meta.dashboard.data_provision import (
-    DashboardDataProviderFactory,
-    DashboardProviderImpl,
-)
+from it_jobs_meta.dashboard.dashboard_components import make_colormap, make_graphs
+from it_jobs_meta.dashboard.data_provision import MongodbDashboardDataProvider
 from it_jobs_meta.dashboard.layout import (
     LayoutDynamicContent,
     LayoutTemplateParameters,
+    make_graphs_layout,
     make_layout,
 )
 
@@ -27,31 +26,30 @@ from it_jobs_meta.dashboard.layout import (
 class DashboardApp:
     def __init__(
         self,
-        data_provider_factory: DashboardDataProviderFactory,
+        data_provider: MongodbDashboardDataProvider,
         layout_template_parameters: LayoutTemplateParameters,
         cache_timeout=timedelta(hours=6),
     ):
         self._app: dash.Dash | None = None
         self._cache: AppCache | None = None
-        self._data_provider_factory = data_provider_factory
-        self._layout_template_parameters = layout_template_parameters
-        self._cache_timeout = cache_timeout
+        self._data_provider: MongodbDashboardDataProvider = data_provider
+        self._layout_template_parameters: LayoutTemplateParameters = layout_template_parameters
+        self._cache_timeout: timedelta = cache_timeout
+        self._technologies_cmap: dict[str, str] | None = None
+        self._categories_cmap: dict[str, str] | None = None
+        self._seniorities_cmap: dict[str, str] | None = None
 
     @property
     def app(self) -> dash.Dash:
         if self._app is None:
-            dashboard_module_path = Path(__file__).parent
             self._app = dash.Dash(
                 'it-jobs-meta-dashboard',
-                assets_folder=dashboard_module_path / 'assets',
-                external_stylesheets=[
-                    dbc.themes.BOOTSTRAP,
-                    dbc.icons.FONT_AWESOME,
-                ],
+                assets_folder=Path(__file__).parent / 'assets',
+                external_stylesheets=[dbc.themes.BOOTSTRAP, dbc.icons.FONT_AWESOME],
                 title='IT Jobs Meta',
                 meta_tags=[
                     {
-                        'description': 'Weekly analysis of IT job offers in Poland',  # noqa: E501
+                        'description': 'Weekly analysis of IT job offers in Poland',
                         'keywords': 'Programming, Software, IT, Jobs',
                         'name': 'viewport',
                         'content': 'width=device-width, initial-scale=1',
@@ -65,40 +63,63 @@ class DashboardApp:
         if self._cache is None:
             self._cache = AppCache(
                 self.app.server,
-                config={
-                    'CACHE_TYPE': 'SimpleCache',
-                    'CACHE_THRESHOLD': 2,
-                },
+                config={'CACHE_TYPE': 'SimpleCache', 'CACHE_THRESHOLD': 2},
             )
         return self._cache
 
-    def render_layout(self) -> DashComponent:
+    def make_layout(self) -> DashComponent:
         logging.info('Rendering dashboard')
         logging.info('Attempting to retrieve data')
-        metadata_df, data_df = self._data_provider_factory.make().gather_data()
+        metadata_df = self._data_provider.fetch_metadata()
+        data_df = self._data_provider.fetch_data(metadata_df.iloc[-1]['batch_id'])
+        self._technologies_cmap = make_colormap(
+            self._data_provider.fetch_field_values_by_count('technology')
+        )
+        self._categories_cmap = make_colormap(
+            self._data_provider.fetch_field_values_by_count('category')
+        )
+        self._seniorities_cmap = make_colormap(
+            self._data_provider.fetch_field_values_by_count('seniority')
+        )
         logging.info('Data retrieval succeeded')
 
         logging.info('Making layout')
-        dynamic_content = self.make_dynamic_content(metadata_df, data_df)
+        dynamic_content = self.make_dynamic_content(
+            metadata_df,
+            data_df,
+            self._technologies_cmap,
+            self._categories_cmap,
+            self._seniorities_cmap,
+        )
         layout = make_layout(self._layout_template_parameters, dynamic_content)
         logging.info('Making layout succeeded')
         logging.info('Rendering dashboard succeeded')
         return layout
 
+    def register_callbacks(self) -> DashComponent:
+        @callback(
+            Output('graphs', 'children'),
+            Input('batch-slider', 'value'),
+            prevent_initial_call=True,
+        )
+        def update_graphs_section(value):
+            metadata_df = self._data_provider.fetch_metadata()
+            data_df = self._data_provider.fetch_data(metadata_df.iloc[value]['batch_id'])
+            graphs = make_graphs(
+                data_df, self._technologies_cmap, self._categories_cmap, self._seniorities_cmap
+            )
+            return make_graphs_layout(graphs)
+
     def run(self, with_wsgi=False):
         try:
             render_layout_memoized = self.cache.memoize(
                 timeout=int(self._cache_timeout.total_seconds())
-            )(self.render_layout)
+            )(self.make_layout)
             self.app.layout = render_layout_memoized
+            self.register_callbacks()
 
             if with_wsgi:
-                wsgi_serve(
-                    self.app.server,
-                    host='0.0.0.0',
-                    port='8080',
-                    url_scheme='https',
-                )
+                wsgi_serve(self.app.server, host='0.0.0.0', port='8080', url_scheme='https')
             else:
                 self.app.run_server(debug=True, host='0.0.0.0', port='8080')
 
@@ -108,10 +129,14 @@ class DashboardApp:
 
     @staticmethod
     def make_dynamic_content(
-        metadata_df: pd.DataFrame, data_df: pd.DataFrame
+        metadata_df: pd.DataFrame,
+        data_df: pd.DataFrame,
+        technologies_cmap: dict[str, str],
+        categories_cmap: dict[str, str],
+        seniorities_cmap: dict[str, str],
     ) -> LayoutDynamicContent:
-        obtained_datetime = pd.to_datetime(metadata_df['obtained_datetime'][0])
-        graphs = GraphRegistry.make(data_df)
+        obtained_datetime = metadata_df['obtained_datetime']
+        graphs = make_graphs(data_df, technologies_cmap, categories_cmap, seniorities_cmap)
         return LayoutDynamicContent(obtained_datetime=obtained_datetime, graphs=graphs)
 
 
@@ -119,15 +144,8 @@ def main():
     """Run the demo dashboard with short cache timout (for development)."""
     setup_logging()
     layout_params = LayoutTemplateParameters()
-    data_warehouse_config_path = Path('config/mongodb_config.yml')
-    data_provider_factory = DashboardDataProviderFactory(
-        DashboardProviderImpl.MONGODB, data_warehouse_config_path
-    )
-    app = DashboardApp(
-        layout_params,
-        data_provider_factory,
-        cache_timeout=timedelta(seconds=30),
-    )
+    data_provider = MongodbDashboardDataProvider.from_config_file(Path('config/mongodb_config.yml'))
+    app = DashboardApp(data_provider, layout_params, cache_timeout=timedelta(seconds=5))
     app.run()
 
 
